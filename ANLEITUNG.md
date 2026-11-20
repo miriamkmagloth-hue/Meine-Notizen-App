@@ -2,7 +2,7 @@
 
 Eine Notizen-App für dein Android-Handy **und** den Computer (im Browser).
 Mit Überschriften, Kontrollkästchen, Textmarker, Unterstreichen, Bildern (mit Zuschneiden und KI-Freistellen),
-Stickern, Notizbüchern und einem Widget. Abgeglichen wird über dein Google Drive.
+Stickern, Ordnern und einem Widget. Abgeglichen wird über dein Google Drive.
 
 Die Einrichtung dauert beim ersten Mal ca. 30 Minuten. Danach läuft alles von selbst.
 
@@ -102,14 +102,14 @@ Damit die App in deinem Google Drive speichern darf, braucht sie eine eigene „
 | Bild zuschneiden | Bild antippen → **Zuschneiden** (Frei, 1:1, 4:3, 16:9, Drehen) |
 | KI | Im Zuschneiden-Fenster: **Auf Motiv zuschneiden** oder **Hintergrund entfernen** (nur in der Android-App, läuft direkt am Handy) |
 | Eigener Sticker | Bild antippen → **Als Sticker**, oder Sticker-Knopf → **Meine Sticker** → **Aus Foto** |
-| Notizbuch | Links **+ Notizbuch**; ⋯ neben einem Notizbuch = umbenennen, Farbe, löschen |
+| Ordner | Links **+ Neuer Ordner** (Name + Farbe); Ordner anklicken, dann **+** = neue Notiz darin; ⋯ neben einem Ordner = Name/Farbe ändern, löschen |
 | Tastenkürzel am Computer | Strg/⌘ + B, I, U · Strg/⌘ + Enter = Kontrollkästchen · Strg/⌘ + ⇧ + H = markieren |
 
 ## Personalisieren
 
 - **Einzelne Wörter:** Text markieren → Knopf **A** (Schriftfarbe, auch eigene Farbe über den bunten Kreis) oder Knopf **AA** (Schriftgröße: Klein bis Riesig).
 - **Ganze Notiz:** Paletten-Symbol 🎨 oben in der Notiz → Hintergrund (Farbe, Papier liniert/kariert/gepunktet oder eigenes Foto mit Abdunkeln/Aufhellen), Schriftgröße und Schriftfarbe.
-- **App:** Einstellungen → **Design** → Akzentfarbe, App-Hintergrund (Farbe oder Foto) und Standard-Aussehen für neue Notizen. Wird auf alle Geräte übertragen.
+- **App:** Paletten-Symbol 🎨 unten in der Seitenleiste (oder Einstellungen → **Design anpassen**) → Vorlagen (Creme, Weiß, Rosé, Salbei, Lavendel, Himmel, Sand, Dunkel), Hell/Dunkel/wie das Gerät, Akzentfarbe, eigene Farben für Seitenleiste, Hintergrund, Notizkarten, Notizpapier und Schrift, App-Hintergrund (Farbe oder Foto) und Standard-Aussehen für neue Notizen. Wird auf alle Geräte übertragen.
 - **Widget:** Beim Hinzufügen oder über ⇄ im Widget → Notiz wählen, Hintergrund (Standard, Farbe oder Foto), Deckkraft und Schriftfarbe. Jedes Widget kann anders aussehen.
 
 ## Wie die Synchronisierung funktioniert

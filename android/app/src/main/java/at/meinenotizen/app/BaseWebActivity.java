@@ -6,6 +6,8 @@ import android.content.IntentSender;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.view.View;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Base64;
@@ -328,6 +330,25 @@ public abstract class BaseWebActivity extends Activity {
         @JavascriptInterface
         public String getMode() {
             return mode();
+        }
+
+        /** Status- und Navigationsleiste an die App-Farben anpassen. */
+        @JavascriptInterface
+        public void setSystemBars(String color, boolean lightBackground) {
+            runOnUiThread(() -> {
+                if (!"main".equals(mode())) return;
+                try {
+                    int c = Color.parseColor(color);
+                    getWindow().setStatusBarColor(c);
+                    getWindow().setNavigationBarColor(c);
+                    View decor = getWindow().getDecorView();
+                    int flags = decor.getSystemUiVisibility();
+                    int light = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                    flags = lightBackground ? (flags | light) : (flags & ~light);
+                    decor.setSystemUiVisibility(flags);
+                } catch (Exception ignored) {
+                }
+            });
         }
 
         @JavascriptInterface
