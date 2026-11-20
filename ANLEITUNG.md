@@ -86,7 +86,7 @@ Damit die App in deinem Google Drive speichern darf, braucht sie eine eigene „
    - **Kästchen antippen** = direkt abhaken
    - **Text antippen** oder ✏️ = Schnellbearbeitung öffnet sich als Fenster über dem Startbildschirm
    - **Titel antippen** = Notiz in der App öffnen
-   - ⇄ = andere Notiz anzeigen
+   - ⇄ = andere Notiz oder anderes Aussehen wählen
    - Das Widget lässt sich größer ziehen, dann zeigt es mehr Zeilen (bis 20).
 
 ---
@@ -104,6 +104,13 @@ Damit die App in deinem Google Drive speichern darf, braucht sie eine eigene „
 | Eigener Sticker | Bild antippen → **Als Sticker**, oder Sticker-Knopf → **Meine Sticker** → **Aus Foto** |
 | Notizbuch | Links **+ Notizbuch**; ⋯ neben einem Notizbuch = umbenennen, Farbe, löschen |
 | Tastenkürzel am Computer | Strg/⌘ + B, I, U · Strg/⌘ + Enter = Kontrollkästchen · Strg/⌘ + ⇧ + H = markieren |
+
+## Personalisieren
+
+- **Einzelne Wörter:** Text markieren → Knopf **A** (Schriftfarbe, auch eigene Farbe über den bunten Kreis) oder Knopf **AA** (Schriftgröße: Klein bis Riesig).
+- **Ganze Notiz:** Paletten-Symbol 🎨 oben in der Notiz → Hintergrund (Farbe, Papier liniert/kariert/gepunktet oder eigenes Foto mit Abdunkeln/Aufhellen), Schriftgröße und Schriftfarbe.
+- **App:** Einstellungen → **Design** → Akzentfarbe, App-Hintergrund (Farbe oder Foto) und Standard-Aussehen für neue Notizen. Wird auf alle Geräte übertragen.
+- **Widget:** Beim Hinzufügen oder über ⇄ im Widget → Notiz wählen, Hintergrund (Standard, Farbe oder Foto), Deckkraft und Schriftfarbe. Jedes Widget kann anders aussehen.
 
 ## Wie die Synchronisierung funktioniert
 

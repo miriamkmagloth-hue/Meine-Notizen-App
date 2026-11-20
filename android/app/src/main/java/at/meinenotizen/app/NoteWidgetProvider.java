@@ -6,6 +6,8 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -56,6 +58,15 @@ public class NoteWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static Integer parseColor(String s) {
+        if (s == null || s.isEmpty()) return null;
+        try {
+            return Color.parseColor(s);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private static int idOf(Context c, String name) {
         return c.getResources().getIdentifier(name, "id", c.getPackageName());
     }
@@ -64,6 +75,36 @@ public class NoteWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_note);
         String noteId = WidgetStore.getWidgetNote(context, widgetId);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+
+        // ---- Aussehen (pro Widget einstellbar) ----
+        JSONObject cfg = WidgetStore.getConfig(context, widgetId);
+        String bgType = cfg.optString("bgType", "default");
+        int alpha = Math.max(0, Math.min(255, Math.round(cfg.optInt("alpha", 100) * 2.55f)));
+        if ("color".equals(bgType)) {
+            Integer c = parseColor(cfg.optString("color", ""));
+            if (c != null) {
+                views.setInt(R.id.bg_fill, "setColorFilter", c);
+            }
+        } else if ("image".equals(bgType)) {
+            Bitmap bmp = WidgetStore.loadImage(context, widgetId);
+            if (bmp != null) {
+                views.setImageViewBitmap(R.id.bg_image, bmp);
+                views.setViewVisibility(R.id.bg_image, View.VISIBLE);
+                views.setViewVisibility(R.id.bg_fill, View.GONE);
+                views.setInt(R.id.bg_image, "setImageAlpha", alpha);
+            }
+        }
+        views.setInt(R.id.bg_fill, "setImageAlpha", alpha);
+        Integer ink = parseColor(cfg.optString("textColor", ""));
+        int inkColor = ink != null ? ink : context.getColor(R.color.widget_text);
+        int mutedColor = ink != null ? ((ink & 0x00FFFFFF) | 0x99000000) : context.getColor(R.color.widget_muted);
+        if (ink != null) {
+            views.setTextColor(R.id.title, inkColor);
+            views.setTextColor(R.id.empty, mutedColor);
+            views.setInt(R.id.btn_switch, "setColorFilter", mutedColor);
+            views.setInt(R.id.btn_edit, "setColorFilter", inkColor);
+        }
+        // Ohne eigene Schriftfarbe folgen die Farben automatisch Hell/Dunkel des Systems.
 
         // Notiz wechseln
         Intent choose = new Intent(context, WidgetConfigActivity.class);
@@ -123,7 +164,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
             if (overflow && i == shown) {
                 views.setViewVisibility(chkId, View.GONE);
                 views.setTextViewText(txtId, context.getString(R.string.widget_more, blocks.length() - shown));
-                views.setTextColor(txtId, context.getColor(R.color.widget_muted));
+                views.setTextColor(txtId, mutedColor);
                 views.setTextViewTextSize(txtId, TypedValue.COMPLEX_UNIT_SP, 13);
                 continue;
             }
@@ -131,7 +172,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
             if (b == null) b = new JSONObject();
             String type = b.optString("t", "p");
             String text = b.optString("x", "");
-            views.setTextColor(txtId, context.getColor(R.color.widget_text));
+            if (ink != null) views.setTextColor(txtId, inkColor);
             views.setTextViewTextSize(txtId, TypedValue.COMPLEX_UNIT_SP, 14.5f);
 
             if ("c".equals(type)) {
@@ -139,6 +180,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
                 int index = b.optInt("i", -1);
                 views.setViewVisibility(chkId, View.VISIBLE);
                 views.setImageViewResource(chkId, checked ? R.drawable.ic_check_on : R.drawable.ic_check_off);
+                if (ink != null && !checked) views.setInt(chkId, "setColorFilter", mutedColor);
                 Intent toggle = new Intent(context, NoteWidgetProvider.class);
                 toggle.setAction(ACTION_TOGGLE);
                 toggle.putExtra(EXTRA_NOTE, noteId);
@@ -150,7 +192,7 @@ public class NoteWidgetProvider extends AppWidgetProvider {
                     SpannableString s = new SpannableString(text);
                     s.setSpan(new StrikethroughSpan(), 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     views.setTextViewText(txtId, s);
-                    views.setTextColor(txtId, context.getColor(R.color.widget_muted));
+                    views.setTextColor(txtId, mutedColor);
                 } else {
                     views.setTextViewText(txtId, text);
                 }

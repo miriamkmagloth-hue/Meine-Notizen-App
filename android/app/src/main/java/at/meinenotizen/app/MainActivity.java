@@ -10,8 +10,8 @@ public class MainActivity extends BaseWebActivity {
     static final String EXTRA_NOTE = "noteId";
 
     @Override
-    protected boolean isQuickMode() {
-        return false;
+    protected String mode() {
+        return "main";
     }
 
     @Override

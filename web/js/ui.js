@@ -35,6 +35,9 @@ export const icons = {
   open: '<path d="M14 4h6v6M20 4l-8 8M18 14v5H5V6h5"/>',
   folder: '<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   heading: '<path d="M6 5v14M18 5v14M6 12h12"/>',
+  textColor: '<path d="M6.5 16L12 4l5.5 12M8.6 11.5h6.8"/>',
+  textSize: '<path d="M3 18l4.5-11L12 18M4.6 14.2h5.8M14 18l3-7 3 7M15 15.8h4"/>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.2-1-1.6-1-2.6 0-1 .8-1.7 1.8-1.7h2A3.9 3.9 0 0 0 20.5 11 8 8 0 0 0 12 3.5z"/><circle cx="7.8" cy="11" r="1.1"/><circle cx="10.5" cy="7.5" r="1.1"/><circle cx="14.8" cy="7.8" r="1.1"/>',
 };
 
 export function icon(name, cls = '') {
@@ -54,8 +57,8 @@ export function esc(s) {
 const openDialogs = [];
 
 /** Öffnet einen Dialog. actions: [{label, primary, danger, onClick(close) -> false hält ihn offen}] */
-export function dialog({ title = '', body = '', actions = [], wide = false, onClose } = {}) {
-  const root = el(`<div class="modal-backdrop"><div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
+export function dialog({ title = '', body = '', actions = [], wide = false, cls = '', onClose } = {}) {
+  const root = el(`<div class="modal-backdrop ${cls}"><div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true">
       ${title ? `<div class="modal-head"><h2>${esc(title)}</h2><button class="icon-btn modal-x" aria-label="Schließen">${icon('close')}</button></div>` : ''}
       <div class="modal-body"></div>
       ${actions.length ? '<div class="modal-actions"></div>' : ''}
@@ -155,4 +158,43 @@ export function relTime(ts) {
   const y = new Date(now); y.setDate(now.getDate() - 1);
   if (d.toDateString() === y.toDateString()) return 'Gestern';
   return d.toLocaleDateString('de-AT', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+}
+
+/**
+ * Farbreihe mit eigenen Farben: Kreise zum Antippen + „Eigene Farbe“ (Farbwähler).
+ * onPick(color|null). noneLabel: zusätzlicher Knopf für „Automatisch/Standard“.
+ */
+export function colorRow(colors, value, onPick, { noneLabel = '' } = {}) {
+  const row = el('<div class="color-row"></div>');
+  const set = v => row.querySelectorAll('[data-c]').forEach(b => b.classList.toggle('on', (b.dataset.c || null) === (v || null) || (!v && b.dataset.c === '')));
+  if (noneLabel) {
+    const b = el(`<button type="button" class="swatch none" data-c="" title="${esc(noneLabel)}"><span>${esc(noneLabel)}</span></button>`);
+    b.onclick = () => { set(null); onPick(null, 'swatch'); };
+    row.append(b);
+  }
+  for (const c of colors) {
+    const b = el(`<button type="button" class="swatch" data-c="${esc(c)}" title="${esc(c)}" style="background:${esc(c)}"></button>`);
+    b.onclick = () => { set(c); onPick(c, 'swatch'); };
+    row.append(b);
+  }
+  const custom = el(`<label class="swatch custom" title="Eigene Farbe"><input type="color"><span>+</span></label>`);
+  const input = custom.querySelector('input');
+  if (value && /^#[0-9a-f]{6}$/i.test(value)) input.value = value;
+  input.addEventListener('input', () => { set(null); custom.classList.add('on'); custom.style.background = input.value; onPick(input.value, 'custom'); });
+  row.append(custom);
+  set(value);
+  if (value && !colors.includes(value) && /^#/.test(value)) { custom.classList.add('on'); custom.style.background = value; }
+  return row;
+}
+
+/** Segment-Schalter. options: [{value, label}] */
+export function segmented(options, value, onChange) {
+  const seg = el('<div class="seg"></div>');
+  for (const o of options) {
+    const b = el(`<button type="button" data-v="${esc(o.value)}">${esc(o.label)}</button>`);
+    b.classList.toggle('on', o.value === value);
+    b.onclick = () => { seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); onChange(o.value); };
+    seg.append(b);
+  }
+  return seg;
 }

@@ -1,7 +1,16 @@
 // Der Text-Editor: Überschriften, Formatierung, Textmarker, Kontrollkästchen, Bilder, Sticker.
-import { icon, toast } from './ui.js';
+import { icon, toast, colorRow } from './ui.js';
+import { TEXT_COLORS } from './theme.js';
 import { fileToDataUrl, pickImageFile, cropDialog } from './imagetools.js';
 import { pickSticker, addCustomSticker } from './stickers.js';
+
+export const SIZES = [
+  { name: 'Klein', value: '0.8em' },
+  { name: 'Normal', value: '' },
+  { name: 'Groß', value: '1.3em' },
+  { name: 'Sehr groß', value: '1.7em' },
+  { name: 'Riesig', value: '2.3em' },
+];
 
 export const HIGHLIGHTS = [
   { name: 'Gelb', color: '#fff0a0' },
@@ -39,8 +48,12 @@ export function sanitize(html) {
       if (tag === 'UL' && child.classList.contains('checklist')) keep.class = 'checklist';
       if (tag === 'LI' && child.hasAttribute('data-checked')) keep['data-checked'] = child.getAttribute('data-checked');
       if (tag === 'SPAN' || tag === 'MARK') {
+        const st = [];
         const bg = child.style.backgroundColor;
-        if (bg && bg !== 'transparent' && !/rgba\(0, 0, 0, 0\)/.test(bg)) keep.style = `background-color: ${bg};`;
+        if (bg && bg !== 'transparent' && !/rgba\(0, 0, 0, 0\)/.test(bg)) st.push(`background-color: ${bg};`);
+        if (child.style.color) st.push(`color: ${child.style.color};`);
+        if (/^[\d.]+em$/.test(child.style.fontSize)) st.push(`font-size: ${child.style.fontSize};`);
+        if (st.length) keep.style = st.join(' ');
       }
       for (const a of [...child.attributes]) child.removeAttribute(a.name);
       for (const [k, v] of Object.entries(keep)) child.setAttribute(k, v);
@@ -64,6 +77,8 @@ export class Editor {
         <button data-cmd="underline" title="Unterstreichen">${icon('underline')}</button>
         <button data-cmd="strikeThrough" title="Durchstreichen">${icon('strike')}</button>
         <button data-cmd="highlight" title="Markieren" class="tb-hl">${icon('highlight')}<span class="hl-swatch"></span></button>
+        <button data-cmd="color" title="Schriftfarbe" class="tb-hl">${icon('textColor')}<span class="fc-swatch"></span></button>
+        <button data-cmd="size" title="Schriftgröße">${icon('textSize')}</button>
         <span class="sep"></span>
         <button data-cmd="checklist" title="Kontrollkästchen">${icon('check')}</button>
         <button data-cmd="bullets" title="Aufzählung">${icon('bullets')}</button>
@@ -76,6 +91,8 @@ export class Editor {
         <button data-cmd="redo" title="Wiederholen">${icon('redo')}</button>
       </div>
       <div class="hl-pop hidden"></div>
+      <div class="fc-pop hidden"></div>
+      <div class="size-pop hidden">${SIZES.map(x => `<button data-size="${x.value}"><span style="font-size:${x.value ? `calc(15px * ${parseFloat(x.value)})` : '15px'}">${x.name}</span></button>`).join('')}</div>
       <div class="block-pop hidden">
         <button data-block="h1"><span class="bp-h1">Titel</span></button>
         <button data-block="h2"><span class="bp-h2">Überschrift</span></button>
@@ -89,6 +106,12 @@ export class Editor {
     this.hlPop = this.root.querySelector('.hl-pop');
     this.blockPop = this.root.querySelector('.block-pop');
     this.imgPop = this.root.querySelector('.img-pop');
+    this.fcPop = this.root.querySelector('.fc-pop');
+    this.sizePop = this.root.querySelector('.size-pop');
+    this.pops = [this.hlPop, this.blockPop, this.fcPop, this.sizePop];
+    this.fcColor = localStorage.getItem('fcColor') || '#d6453d';
+    this.root.querySelector('.fc-swatch').style.background = this.fcColor;
+    this.fcPop.append(colorRow(TEXT_COLORS, null, (c, how) => { this.applyInline('color', c); if (how === 'swatch') this.fcPop.classList.add('hidden'); }, { noneLabel: 'Standard' }));
     this.savedRange = null;
     this.selectedImg = null;
     this.hlColor = localStorage.getItem('hlColor') || HIGHLIGHTS[0].color;
@@ -322,6 +345,51 @@ export class Editor {
     this.changed();
   }
 
+  /** Farbe oder Größe auf den markierten Text anwenden (value leer = zurücksetzen). */
+  applyInline(prop, value) {
+    this.restoreSelection();
+    const sel = getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) { toast('Erst Text auswählen'); return; }
+    document.execCommand('styleWithCSS', false, false);
+    document.execCommand('fontSize', false, '7');
+    const fonts = [...this.content.querySelectorAll('font[size="7"]')];
+    const made = [];
+    for (const f of fonts) {
+      f.querySelectorAll('span').forEach(sp => {
+        sp.style[prop] = '';
+        if (!sp.getAttribute('style')) sp.replaceWith(...sp.childNodes);
+      });
+      const parent = f.parentElement;
+      if (!value && parent && parent.tagName === 'SPAN' && parent.childNodes.length === 1) {
+        parent.style[prop] = '';
+        if (!parent.getAttribute('style')) { parent.replaceWith(...parent.childNodes); }
+      }
+      if (value) {
+        const span = document.createElement('span');
+        span.style[prop] = value;
+        span.append(...f.childNodes);
+        f.replaceWith(span);
+        made.push(span);
+      } else {
+        f.replaceWith(...f.childNodes);
+      }
+    }
+    if (made.length) {
+      const r = document.createRange();
+      r.setStartBefore(made[0]);
+      r.setEndAfter(made[made.length - 1]);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      this.saveSelection();
+    }
+    if (prop === 'color' && value) {
+      this.fcColor = value;
+      localStorage.setItem('fcColor', value);
+      this.root.querySelector('.fc-swatch').style.background = value;
+    }
+    this.changed();
+  }
+
   insertHTMLAtCaret(html) {
     this.restoreSelection();
     document.execCommand('insertHTML', false, html);
@@ -425,9 +493,16 @@ export class Editor {
   bind() {
     const c = this.content;
     // Toolbar-Klicks sollen die Textauswahl nicht verlieren
-    for (const pop of [this.toolbar, this.hlPop, this.blockPop, this.imgPop]) {
+    for (const pop of [this.toolbar, this.hlPop, this.blockPop, this.imgPop, this.sizePop]) {
       pop.addEventListener('mousedown', e => e.preventDefault());
     }
+    this.fcPop.addEventListener('mousedown', e => { if (!e.target.closest('label')) e.preventDefault(); });
+    this.sizePop.addEventListener('click', e => {
+      const b = e.target.closest('[data-size]');
+      if (!b) return;
+      this.applyInline('fontSize', b.dataset.size);
+      this.sizePop.classList.add('hidden');
+    });
     document.addEventListener('selectionchange', () => {
       if (document.activeElement === c) { this.saveSelection(); this.updateToolbar(); }
     });
@@ -436,8 +511,8 @@ export class Editor {
       const b = e.target.closest('button[data-cmd]');
       if (!b) return;
       const cmd = b.dataset.cmd;
-      if (cmd !== 'highlight') this.hlPop.classList.add('hidden');
-      if (cmd !== 'block') this.blockPop.classList.add('hidden');
+      const popFor = { highlight: this.hlPop, block: this.blockPop, color: this.fcPop, size: this.sizePop };
+      this.pops.forEach(p => { if (p !== popFor[cmd]) p.classList.add('hidden'); });
       switch (cmd) {
         case 'bold': case 'italic': case 'underline': case 'strikeThrough': case 'undo': case 'redo':
           this.exec(cmd); break;
@@ -459,6 +534,8 @@ export class Editor {
           break;
         }
         case 'block': this.togglePop(this.blockPop, b); break;
+        case 'color': this.togglePop(this.fcPop, b); break;
+        case 'size': this.togglePop(this.sizePop, b); break;
       }
     });
     // Langes Drücken / Rechtsklick auf den Marker öffnet die Farbauswahl
@@ -557,9 +634,8 @@ export class Editor {
     });
 
     document.addEventListener('click', e => {
-      if (!this.root.contains(e.target)) { this.hlPop.classList.add('hidden'); this.blockPop.classList.add('hidden'); }
-      else if (!e.target.closest('.toolbar') && !e.target.closest('.hl-pop') && !e.target.closest('.block-pop')) {
-        this.hlPop.classList.add('hidden'); this.blockPop.classList.add('hidden');
+      if (!this.root.contains(e.target) || !e.target.closest('.toolbar, .hl-pop, .block-pop, .fc-pop, .size-pop')) {
+        this.pops.forEach(p => p.classList.add('hidden'));
       }
     });
     window.addEventListener('resize', () => this.positionImgPop());
@@ -568,8 +644,7 @@ export class Editor {
 
   togglePop(pop, anchor, forceOpen = false) {
     const willOpen = forceOpen || pop.classList.contains('hidden');
-    this.hlPop.classList.add('hidden');
-    this.blockPop.classList.add('hidden');
+    this.pops.forEach(p => p.classList.add('hidden'));
     if (!willOpen) return;
     pop.classList.remove('hidden');
     const r = anchor.getBoundingClientRect();

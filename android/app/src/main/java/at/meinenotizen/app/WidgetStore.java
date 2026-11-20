@@ -2,6 +2,13 @@ package at.meinenotizen.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -57,7 +64,56 @@ final class WidgetStore {
     }
 
     static void removeWidget(Context c, int widgetId) {
-        prefs(c).edit().remove("w_" + widgetId).apply();
+        prefs(c).edit().remove("w_" + widgetId).remove("cfg_" + widgetId).apply();
+        deleteImage(c, widgetId);
+    }
+
+    // ---------- Aussehen pro Widget ----------
+    static void setConfig(Context c, int widgetId, String json) {
+        prefs(c).edit().putString("cfg_" + widgetId, json).apply();
+    }
+
+    static JSONObject getConfig(Context c, int widgetId) {
+        try {
+            return new JSONObject(prefs(c).getString("cfg_" + widgetId, "{}"));
+        } catch (JSONException e) {
+            return new JSONObject();
+        }
+    }
+
+    static File imageFile(Context c, int widgetId) {
+        return new File(c.getFilesDir(), "widget_bg_" + widgetId + ".jpg");
+    }
+
+    static void deleteImage(Context c, int widgetId) {
+        File f = imageFile(c, widgetId);
+        if (f.exists()) //noinspection ResultOfMethodCallIgnored
+            f.delete();
+    }
+
+    static boolean saveImage(Context c, int widgetId, String dataUrl) {
+        try {
+            byte[] bytes = Base64.decode(dataUrl.substring(dataUrl.indexOf(',') + 1), Base64.DEFAULT);
+            try (FileOutputStream out = new FileOutputStream(imageFile(c, widgetId))) {
+                out.write(bytes);
+            }
+            return true;
+        } catch (IOException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    static Bitmap loadImage(Context c, int widgetId) {
+        File f = imageFile(c, widgetId);
+        if (!f.exists()) return null;
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(f.getAbsolutePath(), bounds);
+        int sample = 1;
+        while (Math.max(bounds.outWidth, bounds.outHeight) / sample > 1000) sample *= 2;
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inSampleSize = sample;
+        return BitmapFactory.decodeFile(f.getAbsolutePath(), opts);
     }
 
     /** Kontrollkästchen im Widget umschalten: sofort in der Kopie ändern und für die App vormerken. */

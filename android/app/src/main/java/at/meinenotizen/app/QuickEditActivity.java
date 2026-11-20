@@ -12,8 +12,8 @@ public class QuickEditActivity extends BaseWebActivity {
     static final String EXTRA_NOTE = "noteId";
 
     @Override
-    protected boolean isQuickMode() {
-        return true;
+    protected String mode() {
+        return "quick";
     }
 
     @Override

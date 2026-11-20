@@ -151,10 +151,15 @@ async function upload(name, obj, fileId) {
 const clean = item => { const { dirty, ...rest } = item; return rest; };
 const fileName = (type, id) => `${type}-${id}.json`;
 
+function stable(v) {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v ?? null);
+}
+
 function sameContent(a, b) {
-  return !!a.deleted === !!b.deleted && (a.title || '') === (b.title || '') && (a.html || '') === (b.html || '') &&
-    (a.name || '') === (b.name || '') && (a.notebookId || '') === (b.notebookId || '') && !!a.pinned === !!b.pinned &&
-    (a.color || '') === (b.color || '') && (a.src || '') === (b.src || '');
+  const strip = x => { const { dirty, updatedAt, text, hasImage, ...r } = x; return stable(r); };
+  return strip(a) === strip(b);
 }
 
 async function applyRemote(type, data) {
@@ -177,7 +182,7 @@ export async function sync({ interactive = false } = {}) {
 
     // 1) Änderungen von anderen Geräten holen
     for (const f of remote) {
-      const m = /^(note|notebook|sticker)-(.+)\.json$/.exec(f.name);
+      const m = /^(note|notebook|sticker|pref)-(.+)\.json$/.exec(f.name);
       if (!m) continue;
       const [, type, id] = m;
       const key = `${type}:${id}`;
@@ -209,7 +214,7 @@ export async function sync({ interactive = false } = {}) {
     }
 
     // 2) Eigene Änderungen hochladen
-    for (const type of ['notebook', 'sticker', 'note']) {
+    for (const type of ['notebook', 'sticker', 'pref', 'note']) {
       for (const item of [...model.listOf(type)]) {
         if (!item.dirty) continue;
         const key = `${type}:${item.id}`;
@@ -221,7 +226,7 @@ export async function sync({ interactive = false } = {}) {
         const current = model.find(type, item.id);
         if (current && current.updatedAt === stamp) {
           current.dirty = false;
-          await db.put(type === 'note' ? 'notes' : type + 's', current);
+          await db.put(model.STORE[type], current);
         }
       }
     }
@@ -248,7 +253,7 @@ export function schedule(delay = 2500) {
 }
 
 export function hasPendingChanges() {
-  return ['note', 'notebook', 'sticker'].some(t => model.listOf(t).some(x => x.dirty));
+  return ['note', 'notebook', 'sticker', 'pref'].some(t => model.listOf(t).some(x => x.dirty));
 }
 
 export function startAutoSync() {

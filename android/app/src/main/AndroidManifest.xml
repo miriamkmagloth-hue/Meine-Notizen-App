@@ -42,7 +42,10 @@
             android:name=".WidgetConfigActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:theme="@style/DialogTheme">
+            android:taskAffinity="at.meinenotizen.app.widget"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|density|navigation"
+            android:theme="@style/QuickTheme">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

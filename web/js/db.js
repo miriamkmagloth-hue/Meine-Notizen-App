@@ -1,6 +1,6 @@
 // Kleine IndexedDB-Hülle: alle Daten bleiben lokal auf dem Gerät gespeichert.
 const DB_NAME = 'meine-notizen';
-const VERSION = 1;
+const VERSION = 2;
 let dbPromise = null;
 
 function open() {
@@ -9,7 +9,7 @@ function open() {
       const req = indexedDB.open(DB_NAME, VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
-        for (const name of ['notes', 'notebooks', 'stickers']) {
+        for (const name of ['notes', 'notebooks', 'stickers', 'prefs']) {
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');

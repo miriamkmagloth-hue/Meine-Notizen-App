@@ -2,9 +2,9 @@
 import * as db from './db.js';
 
 export const DEFAULT_NOTEBOOK = 'default';
-export const state = { notebooks: [], notes: [], stickers: [] };
+export const state = { notebooks: [], notes: [], stickers: [], prefs: [] };
 
-const STORE = { note: 'notes', notebook: 'notebooks', sticker: 'stickers' };
+export const STORE = { note: 'notes', notebook: 'notebooks', sticker: 'stickers', pref: 'prefs' };
 const listeners = new Set();
 
 export function onChange(fn) { listeners.add(fn); }
@@ -22,6 +22,7 @@ export async function load() {
   state.notebooks = await db.getAll('notebooks');
   state.notes = await db.getAll('notes');
   state.stickers = await db.getAll('stickers');
+  state.prefs = await db.getAll('prefs');
   if (!find('notebook', DEFAULT_NOTEBOOK)) {
     // Das Standard-Notizbuch hat auf allen Geräten dieselbe ID und gilt als "alt",
     // damit es beim ersten Abgleich nicht doppelt entsteht.

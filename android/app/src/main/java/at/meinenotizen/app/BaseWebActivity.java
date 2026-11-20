@@ -55,7 +55,19 @@ public abstract class BaseWebActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
     private String pendingAuthCallback;
 
-    protected abstract boolean isQuickMode();
+    /** "main", "quick" (Schnellbearbeitung) oder "widget" (Widget einrichten) */
+    protected abstract String mode();
+
+    protected boolean isQuickMode() {
+        return "quick".equals(mode());
+    }
+
+    /** Nur bei der Widget-Einrichtung gesetzt. */
+    protected int widgetId = android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID;
+
+    /** Wird von der Widget-Einrichtung überschrieben. */
+    protected void onSaveWidgetConfig(String json, String imageDataUrl) {
+    }
 
     protected void setupWebView() {
         web = new WebView(this);
@@ -203,16 +215,21 @@ public abstract class BaseWebActivity extends Activity {
         } else if (requestCode == REQ_AUTH) {
             String cb = pendingAuthCallback;
             pendingAuthCallback = null;
-            if (resultCode != RESULT_OK || data == null) {
-                callback(cb, obj("error", "Anmeldung abgebrochen"));
+            if (data == null) {
+                callback(cb, obj("error", "Anmeldung abgebrochen (keine Antwort von Google, Code " + resultCode + ")"));
                 return;
             }
             try {
+                // Auch bei „abgebrochen“ die genaue Fehlermeldung von Google auslesen
                 AuthorizationResult r = Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(data);
                 if (r.getAccessToken() != null) callback(cb, obj("token", r.getAccessToken()));
-                else callback(cb, obj("error", "Kein Zugriff erhalten"));
+                else callback(cb, obj("error", "Kein Zugriff erhalten (Code " + resultCode + ")"));
             } catch (ApiException e) {
-                callback(cb, obj("error", "Anmeldung fehlgeschlagen (" + e.getStatusCode() + ")"));
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                String hint = e.getStatusCode() == 10
+                        ? " – App-Signatur passt nicht zum Android-Client in Google Cloud (Paketname/SHA-1 prüfen)"
+                        : "";
+                callback(cb, obj("error", "Google-Anmeldung fehlgeschlagen (Fehler " + e.getStatusCode() + hint + ") " + msg));
             }
         }
     }
@@ -306,6 +323,34 @@ public abstract class BaseWebActivity extends Activity {
         @JavascriptInterface
         public boolean isQuickEdit() {
             return isQuickMode();
+        }
+
+        @JavascriptInterface
+        public String getMode() {
+            return mode();
+        }
+
+        @JavascriptInterface
+        public String getWidgetConfig() {
+            JSONObject cfg = WidgetStore.getConfig(getApplicationContext(), widgetId);
+            try {
+                cfg.put("widgetId", widgetId);
+                String noteId = WidgetStore.getWidgetNote(getApplicationContext(), widgetId);
+                if (noteId != null) cfg.put("noteId", noteId);
+                cfg.put("hasImage", WidgetStore.imageFile(getApplicationContext(), widgetId).exists());
+            } catch (JSONException ignored) {
+            }
+            return cfg.toString();
+        }
+
+        @JavascriptInterface
+        public void saveWidgetConfig(String json, String imageDataUrl) {
+            runOnUiThread(() -> onSaveWidgetConfig(json, imageDataUrl));
+        }
+
+        @JavascriptInterface
+        public void cancelWidgetConfig() {
+            runOnUiThread(() -> finish());
         }
 
         @JavascriptInterface

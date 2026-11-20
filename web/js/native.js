@@ -1,9 +1,15 @@
 // Verbindung zur Android-App (nur vorhanden, wenn die Web-App in der Android-Hülle läuft).
 const bridge = window.AndroidBridge || null;
 export const isAndroid = !!bridge;
-export const isQuick = (() => {
-  try { return isAndroid && bridge.isQuickEdit(); } catch { return false; }
+export const mode = (() => {
+  try {
+    if (!isAndroid) return 'main';
+    if (bridge.getMode) return bridge.getMode();
+    return bridge.isQuickEdit() ? 'quick' : 'main';
+  } catch { return 'main'; }
 })();
+export const isQuick = mode === 'quick';
+export const isWidgetCfg = mode === 'widget';
 
 const pending = new Map();
 let seq = 0;

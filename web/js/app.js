@@ -3,8 +3,12 @@ import * as model from './model.js';
 import * as sync from './sync.js';
 import { Editor } from './editor.js';
 import { icon, el, esc, dialog, confirmBox, promptBox, choose, toast, relTime, closeTopDialog } from './ui.js';
-import { isAndroid, isQuick, call } from './native.js';
+import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
+import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss } from './theme.js';
+import { openNoteStyle } from './notestyle.js';
+import { colorRow, segmented } from './ui.js';
+import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
 
 const APP_VERSION = '1.0';
 const $ = s => document.querySelector(s);
@@ -28,6 +32,13 @@ async function init() {
   if (isQuick) document.body.classList.add('quick');
 
   await model.load();
+  applyAppTheme();
+  if (isWidgetCfg) {
+    document.body.classList.add('widgetcfg');
+    const { openWidgetConfig } = await import('./widgetcfg.js');
+    await openWidgetConfig();
+    return;
+  }
   editor = new Editor($('#editor'), { onChange: html => { if (current) { current.html = html; scheduleSave(); } } });
   bindUI();
 
@@ -43,6 +54,7 @@ async function init() {
       if (fromSync && current && item.id === current.id) remoteUpdateOfCurrent(item);
     }
     if (type === 'notebook') pushIndex();
+    if (type === 'pref') applyAppTheme();
     renderSoon();
   });
 
@@ -115,6 +127,7 @@ function remoteUpdateOfCurrent(item, force = false) {
   if (item.deleted) { closeEditor(true); toast('Diese Notiz wurde auf einem anderen Gerät gelöscht'); return; }
   editor.setHTML(item.html);
   $('#note-title').value = item.title || '';
+  applyNoteStyle($('#editor-pane'), item.style);
   autoGrow();
   renderMeta();
 }
@@ -127,6 +140,7 @@ async function openNote(id) {
   current = note;
   isDraft = false;
   showEditor();
+  applyNoteStyle($('#editor-pane'), note.style);
   editor.setHTML(note.html);
   $('#note-title').value = note.title || '';
   $('#saved-state').textContent = '';
@@ -140,8 +154,11 @@ async function newNote() {
   await leaveCurrent();
   const nb = model.find('notebook', view.notebook) && !model.find('notebook', view.notebook).deleted ? view.notebook : model.DEFAULT_NOTEBOOK;
   current = model.newNote(nb);
+  const defaults = appPrefs().noteDefaults;
+  if (defaults && Object.keys(defaults).length) current.style = JSON.parse(JSON.stringify(defaults));
   isDraft = true;
   showEditor();
+  applyNoteStyle($('#editor-pane'), current.style);
   editor.setHTML('');
   $('#note-title').value = '';
   $('#saved-state').textContent = '';
@@ -165,6 +182,7 @@ async function closeEditor(skipSave = false) {
   if (!skipSave) await leaveCurrent(); else current = null;
   $('#editor-wrap').classList.add('hidden');
   $('#editor-empty').classList.remove('hidden');
+  applyNoteStyle($('#editor-pane'), null);
   app.dataset.view = 'list';
   renderList();
 }
@@ -255,6 +273,10 @@ function renderList() {
         ${n.hasImage ? icon('image', 'ni-ic') : ''}${checkProgress(n.html || '')}</div>
     </button>`;
   }).join('');
+  list.querySelectorAll('.note-item').forEach(card => {
+    const n = model.find('note', card.dataset.id);
+    if (n?.style) applyNoteStyle(card, n.style, { card: true });
+  });
 }
 
 function renderMeta() {
@@ -378,6 +400,82 @@ async function noteMenu() {
   }
 }
 
+async function editNoteStyle() {
+  if (!current) return;
+  const note = current;
+  const pane = $('#editor-pane');
+  const final = await openNoteStyle(note.style, {
+    onChange: st => { applyNoteStyle(pane, st); },
+  });
+  if (current !== note) return;
+  note.style = final;
+  applyNoteStyle(pane, final);
+  isDraft = isDraft && model.isEmptyNote({ ...note, text: model.htmlToText(note.html) });
+  if (!isDraft) { await model.saveNote(note); renderList(); }
+}
+
+async function editNoteDefaults() {
+  const final = await openNoteStyle(appPrefs().noteDefaults, {
+    title: 'Standard für neue Notizen',
+    hint: 'Diese Einstellungen bekommt jede neue Notiz automatisch. Bestehende Notizen bleiben, wie sie sind.',
+  });
+  await saveAppPrefs({ noteDefaults: final });
+  toast('Standard gespeichert');
+}
+
+function designSection() {
+  const p = appPrefs();
+  const sec = el(`<section>
+    <h3>${icon('palette')} Design</h3>
+    <p class="muted">Wird auf allen deinen Geräten übernommen.</p>
+    <div class="field"><span>Akzentfarbe</span><div class="accent-row"></div></div>
+    <div class="field"><span>App-Hintergrund (hinter Notizliste und Seitenleiste)</span><div class="appbg-type"></div><div class="appbg-panel"></div></div>
+    <div class="field"><span>Neue Notizen</span><button class="btn" data-x="defaults">${icon('textSize')} Standard-Schrift &amp; -Hintergrund festlegen</button></div>
+  </section>`);
+  sec.querySelector('.accent-row').append(colorRow(ACCENTS, p.accent || null, c => saveAppPrefs({ accent: c || null }), { noneLabel: 'Standard' }));
+  const panel = sec.querySelector('.appbg-panel');
+  let bg = { ...(p.appBg || { type: 'none' }) };
+  const save = () => saveAppPrefs({ appBg: { ...bg } });
+  const render = () => {
+    panel.innerHTML = '';
+    if (bg.type === 'color') panel.append(colorRow(BG_COLORS, bg.color, c => { bg.color = c; save(); }));
+    if (bg.type === 'image') {
+      const box = el(`<div class="bg-image-box"><div class="bg-thumb"></div><div class="bg-image-tools">
+        <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
+        <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label></div></div>`);
+      const thumb = box.querySelector('.bg-thumb');
+      const upd = () => { thumb.style.background = bg.image ? `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover` : ''; };
+      upd();
+      const dim = box.querySelector('.dim');
+      dim.value = Math.round((bg.dim || 0) * 100);
+      dim.addEventListener('input', () => { bg.dim = Number(dim.value) / 100; upd(); applyAppPreview(); });
+      dim.addEventListener('change', save);
+      box.querySelector('.pick').onclick = async () => {
+        const file = await pickImageFile();
+        if (!file) return;
+        const url = await fileToDataUrl(file, 1600);
+        const cropped = await cropDialog(url, { title: 'App-Hintergrund zuschneiden', applyLabel: 'Verwenden' });
+        if (!cropped) return;
+        bg = { type: 'image', image: cropped, dim: bg.dim || 0, lum: await measureLum(cropped) };
+        await save();
+        render();
+      };
+      panel.append(box);
+    }
+  };
+  const applyAppPreview = () => { document.documentElement.style.setProperty('--app-bg', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`); };
+  sec.querySelector('.appbg-type').append(segmented([{ value: 'none', label: 'Standard' }, { value: 'color', label: 'Farbe' }, { value: 'image', label: 'Foto' }], bg.type || 'none', v => {
+    if (v === 'none') bg = { type: 'none' };
+    if (v === 'color') bg = { type: 'color', color: bg.color || BG_COLORS[4] };
+    if (v === 'image') bg = { type: 'image', image: bg.image || '', dim: bg.dim || 0, lum: bg.lum };
+    if (v !== 'image' || bg.image) save();
+    render();
+  }));
+  render();
+  sec.querySelector('[data-x=defaults]').onclick = editNoteDefaults;
+  return sec;
+}
+
 // ---------------- Einstellungen ----------------
 function openSettings() {
   const connected = sync.isConnected();
@@ -409,6 +507,7 @@ function openSettings() {
     ? `Status: ${({ ok: 'verbunden', syncing: 'synchronisiere …', offline: 'offline', error: 'Fehler – ' + st.message, 'needs-auth': 'Anmeldung abgelaufen' })[st.state] || 'verbunden'}` +
       (st.lastSync ? ` · letzter Abgleich ${relTime(st.lastSync)}` : '')
     : 'Status: nicht verbunden';
+  body.querySelector('section').after(designSection());
   const d = dialog({ title: 'Einstellungen', body, wide: true });
   body.querySelector('#client-id')?.addEventListener('change', e => { sync.setClientId(e.target.value); sync.preload(); });
   body.addEventListener('click', async e => {
@@ -515,6 +614,7 @@ function bindUI() {
     renderMeta();
     toast(current.pinned ? 'Angeheftet' : 'Nicht mehr angeheftet');
   };
+  $('#style-btn').onclick = editNoteStyle;
   $('#done-btn').onclick = finishQuick;
   $('#open-app-btn').onclick = async () => { await saveCurrent(); if (current) call('openInApp', current.id); };
   const title = $('#note-title');
