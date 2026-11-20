@@ -5,7 +5,7 @@ import { Editor } from './editor.js';
 import { icon, el, esc, dialog, confirmBox, promptBox, choose, toast, relTime, closeTopDialog } from './ui.js';
 import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
-import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage, setGlass } from './theme.js';
+import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage, setGlass, glassValues } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
@@ -182,12 +182,14 @@ async function closeEditor(skipSave = false) {
   if (!skipSave) await leaveCurrent(); else current = null;
   $('#editor-wrap').classList.add('hidden');
   $('#editor-empty').classList.remove('hidden');
+  $('#editor-pane').classList.add('is-empty');
   applyNoteStyle($('#editor-pane'), null);
   app.dataset.view = 'list';
   renderList();
 }
 
 function showEditor() {
+  $('#editor-pane').classList.remove('is-empty');
   $('#editor-empty').classList.add('hidden');
   $('#editor-wrap').classList.remove('hidden');
   app.dataset.view = 'editor';
@@ -448,6 +450,7 @@ function openDesign() {
     <section><h3>Akzentfarbe</h3><p class="muted small">Knöpfe, Häkchen, Markierungen</p><div class="accent-row"></div></section>
     <section class="custom-colors"><h3>Eigene Farben</h3><div class="cf"></div><button type="button" class="btn small reset-colors">Farben der Vorlage wiederherstellen</button></section>
     <section><h3>App-Hintergrund</h3><p class="muted small">Farbe oder Foto hinter Notizliste und Seitenleiste</p><div class="appbg-type"></div><div class="appbg-panel"></div></section>
+    <section class="blocks-sec"><h3>Durchsichtigkeit der Bereiche</h3><p class="muted small">Wie stark der Hintergrund durch die drei Bereiche scheint. 0 % = ganz durchsichtig, 100 % = deckend. Wirkt, wenn ein App-Hintergrund gewählt ist.</p><div class="blocks"></div></section>
     <section><h3>Neue Notizen</h3><button class="btn" data-x="defaults">${icon('textSize')} Standard-Schrift &amp; -Hintergrund festlegen</button></section>
     <p class="muted small">Gilt auf allen deinen Geräten.</p>
   </div>`);
@@ -527,7 +530,7 @@ function openDesign() {
         <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
         <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label>
         <label class="dim-label">Deckkraft <input type="range" min="10" max="100" step="5" class="op"> <span class="op-val"></span></label>
-        <label class="dim-label">Glas: klar <input type="range" min="0" max="100" step="5" class="glass"> milchig</label></div></div>`);
+</div></div>`);
       const thumb = box.querySelector('.bg-thumb');
       const upd = () => {
         thumb.style.background = bg.image ? `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover` : '';
@@ -544,10 +547,7 @@ function openDesign() {
       opVal.textContent = op.value + ' %';
       op.addEventListener('input', () => { bg.opacity = Number(op.value) / 100; opVal.textContent = op.value + ' %'; upd(); if (bg.image) setAppBgImage(bg); });
       op.addEventListener('change', saveBg);
-      const glass = box.querySelector('.glass');
-      glass.value = typeof appPrefs().glass === 'number' ? appPrefs().glass : 45;
-      glass.addEventListener('input', () => setGlass(Number(glass.value)));
-      glass.addEventListener('change', () => saveAppPrefs({ glass: Number(glass.value) }));
+
       box.querySelector('.pick').onclick = async () => {
         const file = await pickImageFile();
         if (!file) return;
@@ -570,7 +570,22 @@ function openDesign() {
   }));
   body.querySelector('[data-x=defaults]').onclick = editNoteDefaults;
 
-  const renderAll = () => { renderPresets(); renderFonts(); renderMode(); renderAccent(); renderColors(); };
+  const renderBlocks = () => {
+    const box = body.querySelector('.blocks');
+    box.innerHTML = '';
+    const vals = glassValues();
+    for (const [k, label] of [['side', 'Seitenleiste'], ['list', 'Notizliste'], ['note', 'Geöffnete Notiz']]) {
+      const row = el(`<label class="dim-label block-row"><span class="bl-name">${label}</span><input type="range" min="0" max="100" step="5"><span class="op-val"></span></label>`);
+      const input = row.querySelector('input');
+      const out = row.querySelector('.op-val');
+      input.value = vals[k];
+      out.textContent = vals[k] + ' %';
+      input.addEventListener('input', () => { vals[k] = Number(input.value); out.textContent = input.value + ' %'; setGlass(vals); });
+      input.addEventListener('change', () => saveAppPrefs({ glassBlocks: { ...vals } }));
+      box.append(row);
+    }
+  };
+  const renderAll = () => { renderPresets(); renderFonts(); renderMode(); renderAccent(); renderColors(); renderBlocks(); };
   renderAll();
   renderBg();
   dialog({ title: 'Farben & Design', body, wide: true, cls: 'sheet-compact' });

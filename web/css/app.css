@@ -398,7 +398,7 @@ body.has-app-bg #app::before {
   opacity: var(--app-bg-op, 1);
 }
 /* Seitenleiste und Notiz: Glas-Karten (Stärke einstellbar) */
-body.has-app-bg #sidebar, body.has-app-bg #editor-pane {
+body.has-app-bg #sidebar, body.has-app-bg #editor-pane, body.has-app-bg #list-pane {
   border-radius: 24px;
   border: 1px solid var(--glass-border);
   box-shadow: 0 10px 40px rgba(70, 40, 50, .14), inset 0 1px 0 rgba(255,255,255,.35);
@@ -406,12 +406,14 @@ body.has-app-bg #sidebar, body.has-app-bg #editor-pane {
   -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.2);
   backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.2);
 }
-body.has-app-bg #sidebar { background: color-mix(in srgb, var(--side) var(--glass-pct, 55%), transparent); border-right: 1px solid var(--glass-border); }
-body.has-app-bg #editor-pane:not(.has-note-bg) { background: color-mix(in srgb, var(--paper) var(--editor-pct, 82%), transparent); }
+body.has-app-bg #sidebar { background: color-mix(in srgb, var(--side) var(--side-pct, 60%), transparent); border-right: 1px solid var(--glass-border); }
+body.has-app-bg #editor-pane:not(.has-note-bg) { background: color-mix(in srgb, var(--paper) var(--note-pct, 88%), transparent); transition: background .25s; }
+body.has-app-bg #editor-pane.is-empty { background: color-mix(in srgb, var(--paper) var(--empty-pct, 35%), transparent); }
+body.has-app-bg #editor-pane.is-empty .editor-empty { background: color-mix(in srgb, var(--card) 82%, transparent); padding: 26px 30px; border-radius: 22px; box-shadow: 0 6px 22px rgba(70,40,50,.12); }
 /* Notizliste: das Bild bleibt frei sichtbar, nur Karten und Suche schweben darüber */
-body.has-app-bg #list-pane { background: transparent; border: 0; }
+body.has-app-bg #list-pane { background: color-mix(in srgb, var(--bg) var(--list-pct, 35%), transparent); padding: 10px 8px 0; }
 body.has-app-bg #list-pane .pane-head { margin: 0 2px 8px; padding: 6px 8px 6px 12px; min-height: 52px; border-radius: 18px;
-  background: color-mix(in srgb, var(--card) var(--glass-pct, 55%), transparent);
+  background: color-mix(in srgb, var(--card) 72%, transparent);
   -webkit-backdrop-filter: blur(var(--glass-blur, 14px)); backdrop-filter: blur(var(--glass-blur, 14px));
   border: 1px solid var(--glass-border); box-shadow: 0 6px 22px rgba(70, 40, 50, .10); }
 body.has-app-bg #list-pane .pane-head h1 { font-size: 22px; }
@@ -525,3 +527,7 @@ body { font-weight: 500; }
 .fo-big { font-size: 26px; line-height: 1.1; }
 .fo-name { font-size: 14.5px; font-weight: 700; }
 .font-opt small { font-size: 11.5px; color: var(--ink-3); }
+
+.block-row { margin: 6px 0; }
+.block-row .bl-name { min-width: 120px; color: var(--ink); font-weight: 600; }
+.block-row .op-val { min-width: 44px; text-align: right; }

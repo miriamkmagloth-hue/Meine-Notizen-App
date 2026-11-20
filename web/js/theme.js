@@ -240,18 +240,29 @@ export function applyAppTheme() {
   } else if (bg.type === 'image' && bg.image) {
     setAppBgImage(bg);
   }
-  setGlass(typeof p.glass === 'number' ? p.glass : 45);
+  setGlass(glassValues(p));
   const barColor = bg.type === 'color' ? bg.color : getComputedStyle(root).getPropertyValue('--bg').trim();
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', barColor));
   try { window.AndroidBridge?.setSystemBars?.(barColor, luminance(barColor) > 0.4); } catch { /* egal */ }
 }
 
-/** Glas-Effekt: 0 = klar (Bild gut sichtbar) … 100 = milchig (ruhiger). */
-export function setGlass(g) {
+export const GLASS_DEFAULTS = { side: 60, list: 35, note: 88 };
+
+/** Deckkraft der drei Bereiche (0 = ganz durchsichtig … 100 = deckend). */
+export function glassValues(p = appPrefs()) {
+  const g = p.glassBlocks || {};
+  const v = k => (typeof g[k] === 'number' ? g[k] : GLASS_DEFAULTS[k]);
+  return { side: v('side'), list: v('list'), note: v('note') };
+}
+
+export function setGlass({ side, list, note }) {
   const root = document.documentElement;
-  root.style.setProperty('--glass-pct', Math.round(25 + g * 0.65) + '%');
-  root.style.setProperty('--glass-blur', Math.round(3 + g * 0.25) + 'px');
-  root.style.setProperty('--editor-pct', Math.round(62 + g * 0.34) + '%');
+  root.style.setProperty('--side-pct', side + '%');
+  root.style.setProperty('--list-pct', list + '%');
+  root.style.setProperty('--note-pct', note + '%');
+  // Solange keine Notiz offen ist, ist auch der rechte Bereich so durchsichtig wie die Notizliste
+  root.style.setProperty('--empty-pct', Math.min(note, list) + '%');
+  root.style.setProperty('--glass-blur', Math.round(4 + Math.max(side, list) * 0.16) + 'px');
 }
 
 /** App-Hintergrundbild setzen (auch für die Live-Vorschau im Design-Dialog). */
