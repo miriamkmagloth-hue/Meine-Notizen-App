@@ -8,6 +8,7 @@ import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
 import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage, setGlass, glassValues } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
 import { startBackup, runBackup, onBackupStatus, backupStatus, rootLink } from './backup.js';
+import { checkForUpdate, appVersion, APK_URL } from './update.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
 
@@ -62,6 +63,7 @@ async function init() {
   sync.onStatus(renderSync);
   sync.startAutoSync();
   startBackup();
+  if (isAndroid && !isQuick) setTimeout(showUpdateHint, 4000);
   sync.preload();
 
   const hash = new URLSearchParams(location.hash.slice(1));
@@ -593,6 +595,13 @@ function openDesign() {
   dialog({ title: 'Farben & Design', body, wide: true, cls: 'sheet-compact' });
 }
 
+async function showUpdateHint() {
+  const upd = await checkForUpdate();
+  if (!upd || document.querySelector('.update-pill')) return;
+  const pill = el(`<a class="update-pill" href="${esc(upd.url)}">${icon('open')}<span>Neue App-Version ${esc(upd.version)} – tippen zum Herunterladen</span></a>`);
+  $('#list-pane').insertBefore(pill, $('#note-list'));
+}
+
 // ---------------- Einstellungen ----------------
 function openSettings() {
   const connected = sync.isConnected();
@@ -623,6 +632,7 @@ function openSettings() {
         <button class="btn" data-s="import">Sicherung importieren</button>
       </div>
     </section>
+    ${isAndroid ? `<section><h3>${icon('open')} App-Version</h3><p class="muted">Installiert: ${esc(appVersion() || '?')}</p><p class="update-line muted"></p><div class="row"><a class="btn" href="${APK_URL}">Neueste Version herunterladen</a></div></section>` : ''}
     <section class="muted small">Meine Notizen ${APP_VERSION} · Tipps: „[] “ + Leertaste am Zeilenanfang erzeugt ein Kontrollkästchen, „# “ eine Überschrift.</section>
   </div>`);
   const st = sync.status;
@@ -666,6 +676,7 @@ function openSettings() {
       row.append(now, open, off);
     }
   };
+  if (isAndroid) checkForUpdate().then(u => { const l = body.querySelector('.update-line'); if (l) l.textContent = u ? `Neu verfügbar: ${u.version}` : 'Du hast die neueste Version.'; });
   renderBackup();
   onBackupStatus(() => { if (document.body.contains(body)) renderBackup(); });
   body.querySelector('#client-id')?.addEventListener('change', e => { sync.setClientId(e.target.value); sync.preload(); });

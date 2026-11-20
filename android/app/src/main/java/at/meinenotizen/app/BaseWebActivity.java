@@ -337,6 +337,15 @@ public abstract class BaseWebActivity extends Activity {
             return mode();
         }
 
+        @JavascriptInterface
+        public String getAppVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
         /** Akzentfarbe der App merken, damit die Häkchen im Widget dazu passen. */
         @JavascriptInterface
         public void setAccentColor(String color) {

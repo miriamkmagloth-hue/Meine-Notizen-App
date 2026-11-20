@@ -532,3 +532,6 @@ body { font-weight: 500; }
 .block-row .bl-name { min-width: 120px; color: var(--ink); font-weight: 600; }
 .block-row .op-val { min-width: 44px; text-align: right; }
 a.btn { text-decoration: none; color: inherit; }
+
+.update-pill { display: flex; align-items: center; gap: 8px; margin: 0 14px 10px; padding: 10px 14px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 14px; text-decoration: none; box-shadow: var(--shadow); }
+.update-pill .ic { width: 18px; height: 18px; }
