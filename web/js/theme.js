@@ -244,6 +244,11 @@ export function applyAppTheme() {
   const barColor = bg.type === 'color' ? bg.color : getComputedStyle(root).getPropertyValue('--bg').trim();
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', barColor));
   try { window.AndroidBridge?.setSystemBars?.(barColor, luminance(barColor) > 0.4); } catch { /* egal */ }
+  // Widget: Häkchen in der App-Akzentfarbe
+  try {
+    const acc = getComputedStyle(root).getPropertyValue('--accent').trim();
+    if (/^#[0-9a-f]{6}$/i.test(acc)) window.AndroidBridge?.setAccentColor?.(acc);
+  } catch { /* egal */ }
 }
 
 export const GLASS_DEFAULTS = { side: 60, list: 35, note: 88 };

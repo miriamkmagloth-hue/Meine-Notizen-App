@@ -68,6 +68,18 @@ final class WidgetStore {
         deleteImage(c, widgetId);
     }
 
+    /** Akzentfarbe der App (für die Häkchen im Widget). Gibt true zurück, wenn sie sich geändert hat. */
+    static boolean setAccent(Context c, String color) {
+        String old = prefs(c).getString("accent", "");
+        if (old.equals(color)) return false;
+        prefs(c).edit().putString("accent", color).apply();
+        return true;
+    }
+
+    static String getAccent(Context c) {
+        return prefs(c).getString("accent", "");
+    }
+
     // ---------- Aussehen pro Widget ----------
     static void setConfig(Context c, int widgetId, String json) {
         prefs(c).edit().putString("cfg_" + widgetId, json).apply();

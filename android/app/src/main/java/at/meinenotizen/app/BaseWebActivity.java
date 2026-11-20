@@ -337,6 +337,14 @@ public abstract class BaseWebActivity extends Activity {
             return mode();
         }
 
+        /** Akzentfarbe der App merken, damit die Häkchen im Widget dazu passen. */
+        @JavascriptInterface
+        public void setAccentColor(String color) {
+            if (WidgetStore.setAccent(getApplicationContext(), color)) {
+                NoteWidgetProvider.refreshNote(getApplicationContext(), null);
+            }
+        }
+
         /** Status- und Navigationsleiste an die App-Farben anpassen. */
         @JavascriptInterface
         public void setSystemBars(String color, boolean lightBackground) {

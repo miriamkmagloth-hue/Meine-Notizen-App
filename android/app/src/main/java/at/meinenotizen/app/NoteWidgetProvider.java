@@ -7,7 +7,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -58,6 +62,33 @@ public class NoteWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    /** Abgehaktes Kästchen in der App-Akzentfarbe zeichnen. */
+    private static Bitmap checkBitmap(Context c, int color) {
+        float d = c.getResources().getDisplayMetrics().density;
+        int size = Math.round(20 * d);
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setColor(color);
+        canvas.drawRoundRect(new RectF(0.5f * d, 0.5f * d, size - 0.5f * d, size - 0.5f * d), 4.5f * d, 4.5f * d, fill);
+        Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        stroke.setColor(luminance(color) > 0.6 ? 0xFF26221E : Color.WHITE);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(2.4f * d);
+        stroke.setStrokeCap(Paint.Cap.ROUND);
+        stroke.setStrokeJoin(Paint.Join.ROUND);
+        Path p = new Path();
+        p.moveTo(5f * d, 10.5f * d);
+        p.lineTo(8.2f * d, 13.7f * d);
+        p.lineTo(15f * d, 7f * d);
+        canvas.drawPath(p, stroke);
+        return bmp;
+    }
+
+    private static double luminance(int color) {
+        return (0.2126 * Color.red(color) + 0.7152 * Color.green(color) + 0.0722 * Color.blue(color)) / 255.0;
+    }
+
     private static Integer parseColor(String s) {
         if (s == null || s.isEmpty()) return null;
         try {
@@ -105,6 +136,9 @@ public class NoteWidgetProvider extends AppWidgetProvider {
             views.setInt(R.id.btn_edit, "setColorFilter", inkColor);
         }
         // Ohne eigene Schriftfarbe folgen die Farben automatisch Hell/Dunkel des Systems.
+        Integer accent = parseColor(WidgetStore.getAccent(context));
+        Bitmap checkedBmp = accent != null ? checkBitmap(context, accent) : null;
+        if (accent != null && ink == null) views.setInt(R.id.btn_edit, "setColorFilter", accent);
 
         // Notiz wechseln
         Intent choose = new Intent(context, WidgetConfigActivity.class);
@@ -179,7 +213,8 @@ public class NoteWidgetProvider extends AppWidgetProvider {
                 boolean checked = b.optBoolean("c", false);
                 int index = b.optInt("i", -1);
                 views.setViewVisibility(chkId, View.VISIBLE);
-                views.setImageViewResource(chkId, checked ? R.drawable.ic_check_on : R.drawable.ic_check_off);
+                if (checked && checkedBmp != null) views.setImageViewBitmap(chkId, checkedBmp);
+                else views.setImageViewResource(chkId, checked ? R.drawable.ic_check_on : R.drawable.ic_check_off);
                 if (ink != null && !checked) views.setInt(chkId, "setColorFilter", mutedColor);
                 Intent toggle = new Intent(context, NoteWidgetProvider.class);
                 toggle.setAction(ACTION_TOGGLE);
