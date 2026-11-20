@@ -173,9 +173,14 @@ public abstract class BaseWebActivity extends Activity {
     }
 
     // ---------- Google-Anmeldung für Drive ----------
-    private void requestToken(boolean interactive, String cbId) {
+    private void requestToken(String scopes, boolean interactive, String cbId) {
+        java.util.List<Scope> list = new java.util.ArrayList<>();
+        for (String sc : scopes.trim().split("\\s+")) {
+            if (!sc.isEmpty()) list.add(new Scope(sc));
+        }
+        if (list.isEmpty()) list.add(new Scope(DRIVE_SCOPE));
         AuthorizationRequest req = AuthorizationRequest.builder()
-                .setRequestedScopes(Collections.singletonList(new Scope(DRIVE_SCOPE)))
+                .setRequestedScopes(list)
                 .build();
         Identity.getAuthorizationClient(this).authorize(req)
                 .addOnSuccessListener(result -> {
@@ -376,7 +381,13 @@ public abstract class BaseWebActivity extends Activity {
 
         @JavascriptInterface
         public void requestToken(boolean interactive, String cbId) {
-            runOnUiThread(() -> BaseWebActivity.this.requestToken(interactive, cbId));
+            runOnUiThread(() -> BaseWebActivity.this.requestToken(DRIVE_SCOPE, interactive, cbId));
+        }
+
+        /** Anmeldung mit mehreren Berechtigungen (durch Leerzeichen getrennt). */
+        @JavascriptInterface
+        public void requestTokenScopes(String scopes, boolean interactive, String cbId) {
+            runOnUiThread(() -> BaseWebActivity.this.requestToken(scopes, interactive, cbId));
         }
 
         @JavascriptInterface

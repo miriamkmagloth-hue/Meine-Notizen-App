@@ -4,9 +4,18 @@ import * as db from './db.js';
 import * as model from './model.js';
 import { isAndroid, callAsync } from './native.js';
 
-const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
-const API = 'https://www.googleapis.com/drive/v3';
-const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+const SCOPE_APPDATA = 'https://www.googleapis.com/auth/drive.appdata';
+export const SCOPE_FILE = 'https://www.googleapis.com/auth/drive.file';
+export const API = 'https://www.googleapis.com/drive/v3';
+export const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+
+/** Lesbare Sicherung eingeschaltet? (gilt für alle Geräte) */
+export const backupWanted = () => !!model.find('pref', 'app')?.backup;
+const wantedScopes = () => (backupWanted() ? [SCOPE_APPDATA, SCOPE_FILE] : [SCOPE_APPDATA]).join(' ');
+let tokenScopes = '';
+export const hasScope = sc => tokenScopes.split(' ').includes(sc);
+const afterSync = new Set();
+export const onAfterSync = fn => afterSync.add(fn);
 const MAX_BYTES = 4.8 * 1024 * 1024;
 
 let token = null;
@@ -45,15 +54,24 @@ function loadGis() {
   return gisLoaded;
 }
 
-async function getToken(interactive) {
-  if (token && Date.now() < tokenExpires - 60_000) return token;
+export async function getToken(interactive) {
+  const want = wantedScopes();
+  if (token && Date.now() < tokenExpires - 60_000 && (want.split(' ').every(hasScope) || !interactive && tokenScopes)) return token;
   token = null;
   if (isAndroid) {
-    const r = await callAsync('requestToken', !!interactive);
+    const r = window.AndroidBridge.requestTokenScopes
+      ? await callAsync('requestTokenScopes', want, !!interactive)
+      : await callAsync('requestToken', !!interactive);
     if (r.token) {
       token = r.token;
+      tokenScopes = window.AndroidBridge.requestTokenScopes ? want : SCOPE_APPDATA;
       tokenExpires = Date.now() + 50 * 60_000;
       return token;
+    }
+    if (r.needsUi && want !== SCOPE_APPDATA && !interactive) {
+      // Neue Berechtigung noch nicht erteilt: weiter nur synchronisieren, Sicherung wartet
+      const r2 = await callAsync('requestTokenScopes', SCOPE_APPDATA, false);
+      if (r2.token) { token = r2.token; tokenScopes = SCOPE_APPDATA; tokenExpires = Date.now() + 50 * 60_000; return token; }
     }
     if (r.needsUi) return null;
     throw new Error(r.error || 'Anmeldung fehlgeschlagen');
@@ -64,10 +82,12 @@ async function getToken(interactive) {
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: SCOPE,
+      scope: want,
+      include_granted_scopes: true,
       callback: resp => {
         if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
         token = resp.access_token;
+        tokenScopes = resp.scope || SCOPE_APPDATA;
         tokenExpires = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
         resolve(token);
       },
@@ -98,7 +118,7 @@ export function disconnect() {
 
 // ---------- Drive-API ----------
 
-async function api(url, opts = {}, retry = true) {
+export async function api(url, opts = {}, retry = true) {
   const t = await getToken(false);
   if (!t) { const e = new Error('NEEDS_AUTH'); e.needsAuth = true; throw e; }
   const res = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + t } });
@@ -250,6 +270,7 @@ export async function sync({ interactive = false } = {}) {
     status.lastSync = Date.now();
     localStorage.setItem('lastSync', String(status.lastSync));
     setStatus('ok');
+    afterSync.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
   } catch (e) {
     console.warn('Sync', e);
     if (e.needsAuth) setStatus('needs-auth', 'Bitte erneut mit Google verbinden');

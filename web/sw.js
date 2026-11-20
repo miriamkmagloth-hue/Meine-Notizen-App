@@ -3,7 +3,7 @@
 const CACHE = 'meine-notizen-v3';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/db.js', 'js/model.js', 'js/native.js', 'js/sync.js',
   'js/ui.js', 'js/theme.js', 'js/notestyle.js', 'js/widgetcfg.js', 'js/editor.js', 'js/imagetools.js', 'js/stickers.js',
-  'js/widget.js', 'manifest.webmanifest', 'icons/icon.svg'];
+  'js/widget.js', 'js/backup.js', 'manifest.webmanifest', 'icons/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

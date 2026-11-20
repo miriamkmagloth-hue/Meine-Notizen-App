@@ -7,6 +7,7 @@ import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
 import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage, setGlass, glassValues } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
+import { startBackup, runBackup, onBackupStatus, backupStatus, rootLink } from './backup.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
 
@@ -60,6 +61,7 @@ async function init() {
 
   sync.onStatus(renderSync);
   sync.startAutoSync();
+  startBackup();
   sync.preload();
 
   const hash = new URLSearchParams(location.hash.slice(1));
@@ -607,8 +609,14 @@ function openSettings() {
           : '<button class="btn primary" data-s="connect">Mit Google Drive verbinden</button>'}
       </div>
     </section>
+    <section class="backup-sec">
+      <h3>${icon('folder')} Lesbare Sicherung in Google Drive</h3>
+      <p class="muted">Jede Notiz wird zusätzlich als <b>Google-Dokument</b> im sichtbaren Ordner „Meine Notizen – Sicherung“ in deinem Google Drive abgelegt, sortiert nach deinen Ordnern, und nach Änderungen automatisch aktualisiert. So kommst du immer an deine Notizen – auch ganz ohne die App.</p>
+      <p class="status-line backup-status"></p>
+      <div class="row backup-row"></div>
+    </section>
     <section>
-      <h3>${icon('folder')} Datensicherung</h3>
+      <h3>${icon('folder')} Datensicherung als Datei</h3>
       <p class="muted">Zusätzlich zur Synchronisierung kannst du alles als Datei sichern oder eine Sicherung einlesen.</p>
       <div class="row">
         ${isAndroid ? '' : '<button class="btn" data-s="export">Alles exportieren</button>'}
@@ -626,6 +634,40 @@ function openSettings() {
   designBtn.querySelector('button').onclick = () => { d.close(); openDesign(); };
   body.querySelector('section').after(designBtn);
   const d = dialog({ title: 'Einstellungen', body, wide: true });
+  const renderBackup = () => {
+    const on = !!appPrefs().backup;
+    const st = body.querySelector('.backup-status');
+    st.textContent = !on ? 'Status: aus'
+      : backupStatus.running ? 'Status: sichert gerade …'
+      : backupStatus.error ? 'Status: ' + backupStatus.error
+      : backupStatus.last ? `Status: an · zuletzt gesichert ${relTime(backupStatus.last)}` : 'Status: an';
+    const row = body.querySelector('.backup-row');
+    row.innerHTML = '';
+    if (!on) {
+      const b = el('<button class="btn primary">Sicherung einschalten</button>');
+      b.onclick = async () => {
+        if (!sync.isConnected()) { toast('Bitte zuerst mit Google Drive verbinden'); return; }
+        try {
+          await saveAppPrefs({ backup: true });
+          await sync.getToken(true);
+          toast('Sicherung eingeschaltet – die Notizen werden jetzt abgelegt');
+          renderBackup();
+          await runBackup({ force: true });
+        } catch (e) { toast(e.message); }
+      };
+      row.append(b);
+    } else {
+      const now = el('<button class="btn primary">Jetzt sichern</button>');
+      now.onclick = async () => { try { if (backupStatus.error) await sync.getToken(true); } catch (e) { toast(e.message); return; } runBackup({ force: !!backupStatus.error }); };
+      const open = el(`<a class="btn" target="_blank" rel="noopener">In Google Drive öffnen</a>`);
+      open.href = rootLink();
+      const off = el('<button class="btn">Ausschalten</button>');
+      off.onclick = async () => { await saveAppPrefs({ backup: false }); renderBackup(); toast('Sicherung ausgeschaltet – vorhandene Dokumente bleiben in Drive'); };
+      row.append(now, open, off);
+    }
+  };
+  renderBackup();
+  onBackupStatus(() => { if (document.body.contains(body)) renderBackup(); });
   body.querySelector('#client-id')?.addEventListener('change', e => { sync.setClientId(e.target.value); sync.preload(); });
   body.addEventListener('click', async e => {
     const act = e.target.closest('[data-s]')?.dataset.s;
