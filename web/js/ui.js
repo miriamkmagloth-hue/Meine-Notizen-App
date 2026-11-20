@@ -132,7 +132,7 @@ export function choose(title, options) {
     const list = el('<div class="choice-list"></div>');
     const d = dialog({ title, body: list, onClose: () => resolve(result) });
     for (const o of options) {
-      const b = el(`<button class="choice">${o.color ? `<span class="dot" style="background:${esc(o.color)}"></span>` : ''}<span>${esc(o.label)}</span></button>`);
+      const b = el(`<button class="choice">${o.iconHtml || (o.color ? `<span class="dot" style="background:${esc(o.color)}"></span>` : '')}<span>${esc(o.label)}</span></button>`);
       b.onclick = () => { result = o.value; d.close(); };
       list.append(b);
     }

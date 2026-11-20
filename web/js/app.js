@@ -1,11 +1,11 @@
-// Hauptprogramm: Notizbücher, Notizliste, Editor, Einstellungen.
+// Hauptprogramm: Ordner, Notizliste, Editor, Einstellungen.
 import * as model from './model.js';
 import * as sync from './sync.js';
 import { Editor } from './editor.js';
 import { icon, el, esc, dialog, confirmBox, promptBox, choose, toast, relTime, closeTopDialog } from './ui.js';
 import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
-import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss } from './theme.js';
+import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
@@ -231,11 +231,11 @@ function renderNav() {
   ];
   const nav = $('#nav');
   nav.innerHTML = items.map(i => `<button class="nav-item ${view.notebook === i.id ? 'on' : ''}" data-nb="${i.id}">${icon(i.ic)}<span class="nav-name">${i.name}</span><span class="count">${i.n || ''}</span></button>`).join('') +
-    '<div class="nav-label">Notizbücher</div>' +
+    '<div class="nav-label">Ordner</div>' +
     sortedNotebooks().map(b => `<div class="nav-item nb ${view.notebook === b.id ? 'on' : ''}" data-nb="${esc(b.id)}" role="button" tabindex="0">
-        <span class="dot" style="background:${esc(b.color || COLORS[0])}"></span><span class="nav-name">${esc(b.name)}</span>
+        ${folderIcon(b.color || COLORS[0])}<span class="nav-name">${esc(b.name)}</span>
         <span class="count">${count(b.id) || ''}</span>
-        <button class="icon-btn nb-more" data-more="${esc(b.id)}" title="Notizbuch bearbeiten">${icon('more')}</button></div>`).join('');
+        <button class="icon-btn nb-more" data-more="${esc(b.id)}" title="Ordner bearbeiten">${icon('more')}</button></div>`).join('');
   const title = view.notebook === 'all' ? 'Alle Notizen' : view.notebook === 'pinned' ? 'Angeheftet' : (model.find('notebook', view.notebook)?.name || 'Notizen');
   $('#list-title').textContent = title;
 }
@@ -269,7 +269,7 @@ function renderList() {
       <div class="ni-top"><span class="ni-title">${esc(title)}</span>${n.pinned ? `<span class="ni-pin">${icon('pin')}</span>` : ''}</div>
       ${snippet ? `<div class="ni-snippet">${esc(snippet)}</div>` : ''}
       <div class="ni-meta"><span>${relTime(n.updatedAt)}</span>
-        ${view.notebook === 'all' && nb ? `<span class="ni-nb"><span class="dot" style="background:${esc(nb.color)}"></span>${esc(nb.name)}</span>` : ''}
+        ${view.notebook === 'all' && nb ? `<span class="ni-nb">${folderIcon(nb.color)}${esc(nb.name)}</span>` : ''}
         ${n.hasImage ? icon('image', 'ni-ic') : ''}${checkProgress(n.html || '')}</div>
     </button>`;
   }).join('');
@@ -282,7 +282,7 @@ function renderList() {
 function renderMeta() {
   if (!current) return;
   const nb = model.find('notebook', current.notebookId) || model.find('notebook', model.DEFAULT_NOTEBOOK);
-  $('#nb-chip').innerHTML = `<span class="dot" style="background:${esc(nb?.color || COLORS[0])}"></span>${esc(nb?.name || 'Allgemein')}`;
+  $('#nb-chip').innerHTML = `${folderIcon(nb?.color || COLORS[0])}${esc(nb?.name || 'Allgemein')}`;
   $('#pin-btn').classList.toggle('on', !!current.pinned);
   $('#note-meta').textContent = current.updatedAt
     ? `Zuletzt bearbeitet ${relTime(current.updatedAt)}${current.createdAt ? ' · erstellt ' + new Date(current.createdAt).toLocaleDateString('de-AT') : ''}`
@@ -326,22 +326,38 @@ async function onSyncClick() {
   sync.sync({ interactive: false });
 }
 
+/** Dialog für einen neuen oder bestehenden Ordner: Name und Farbe. */
+function folderDialog(title, name = '', color = FOLDER_COLORS[0]) {
+  return new Promise(resolve => {
+    let result = null;
+    let col = color;
+    const body = el(`<div class="folder-form">
+      <label class="field"><span>Name</span><input class="text-input" placeholder="z. B. Arbeit, Privat, Einkauf"></label>
+      <div class="field"><span>Farbe</span><div class="fc"></div></div>
+    </div>`);
+    const input = body.querySelector('input');
+    input.value = name;
+    body.querySelector('.fc').append(colorRow(FOLDER_COLORS, color, c => { col = c; }));
+    const done = () => { if (input.value.trim()) result = { name: input.value.trim(), color: col }; };
+    const d = dialog({ title, body, actions: [{ label: 'Abbrechen' }, { label: 'Speichern', primary: true, onClick: done }], onClose: () => resolve(result) });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { done(); d.close(); } });
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
 async function notebookMenu(id) {
   const nb = model.find('notebook', id);
   if (!nb) return;
-  const opts = [{ label: 'Umbenennen', value: 'rename' }, { label: 'Farbe ändern', value: 'color' }];
-  if (id !== model.DEFAULT_NOTEBOOK) opts.push({ label: 'Notizbuch löschen', value: 'delete' });
+  const opts = [{ label: 'Name & Farbe ändern', value: 'edit' }];
+  if (id !== model.DEFAULT_NOTEBOOK) opts.push({ label: 'Ordner löschen', value: 'delete' });
   const act = await choose(nb.name, opts);
-  if (act === 'rename') {
-    const name = await promptBox('Notizbuch umbenennen', nb.name);
-    if (name) { nb.name = name; await model.save('notebook', nb); }
-  } else if (act === 'color') {
-    const c = await choose('Farbe wählen', COLORS.map((col, i) => ({ label: ['Orange', 'Rot', 'Pink', 'Lila', 'Indigo', 'Blau', 'Türkis', 'Grün', 'Braun', 'Grau'][i], value: col, color: col })));
-    if (c) { nb.color = c; await model.save('notebook', nb); }
+  if (act === 'edit') {
+    const r = await folderDialog('Ordner bearbeiten', nb.name, nb.color);
+    if (r) { nb.name = r.name; nb.color = r.color; await model.save('notebook', nb); }
   } else if (act === 'delete') {
     const notes = model.active('note').filter(n => n.notebookId === id);
-    const ok = await confirmBox('Notizbuch löschen?',
-      notes.length ? `Die ${notes.length} Notiz(en) darin werden nach „Allgemein“ verschoben.` : 'Das Notizbuch ist leer.', 'Löschen', true);
+    const ok = await confirmBox('Ordner löschen?',
+      notes.length ? `Die ${notes.length} Notiz(en) darin werden nach „Allgemein“ verschoben.` : 'Der Ordner ist leer.', 'Löschen', true);
     if (!ok) return;
     for (const n of notes) { n.notebookId = model.DEFAULT_NOTEBOOK; await model.saveNote(n); }
     await model.remove('notebook', id);
@@ -351,18 +367,18 @@ async function notebookMenu(id) {
 }
 
 async function addNotebook() {
-  const name = await promptBox('Neues Notizbuch', '', 'z. B. Arbeit, Privat, Einkauf');
-  if (!name) return;
   const used = new Set(model.active('notebook').map(b => b.color));
-  const color = COLORS.find(c => !used.has(c)) || COLORS[Math.floor(Math.random() * COLORS.length)];
-  const nb = await model.save('notebook', { id: model.uid(), name, color, createdAt: Date.now() });
+  const suggestion = FOLDER_COLORS.find(c => !used.has(c)) || FOLDER_COLORS[0];
+  const r = await folderDialog('Neuer Ordner', '', suggestion);
+  if (!r) return;
+  const nb = await model.save('notebook', { id: model.uid(), name: r.name, color: r.color, createdAt: Date.now() });
   view.notebook = nb.id;
   render();
 }
 
 async function moveCurrent() {
   if (!current) return;
-  const target = await choose('Verschieben nach …', sortedNotebooks().map(b => ({ label: b.name, value: b.id, color: b.color })));
+  const target = await choose('In Ordner verschieben', sortedNotebooks().map(b => ({ label: b.name, value: b.id, iconHtml: folderIcon(b.color) })));
   if (!target || target === current.notebookId) return;
   current.notebookId = target;
   isDraft = false;
@@ -374,7 +390,7 @@ async function moveCurrent() {
 async function noteMenu() {
   if (!current) return;
   const opts = [
-    { label: 'In anderes Notizbuch verschieben', value: 'move' },
+    { label: 'In anderen Ordner verschieben', value: 'move' },
     { label: 'Duplizieren', value: 'dup' },
     { label: 'Notiz löschen', value: 'delete' },
   ];
@@ -423,22 +439,77 @@ async function editNoteDefaults() {
   toast('Standard gespeichert');
 }
 
-function designSection() {
-  const p = appPrefs();
-  const sec = el(`<section>
-    <h3>${icon('palette')} Design</h3>
-    <p class="muted">Wird auf allen deinen Geräten übernommen.</p>
-    <div class="field"><span>Akzentfarbe</span><div class="accent-row"></div></div>
-    <div class="field"><span>App-Hintergrund (hinter Notizliste und Seitenleiste)</span><div class="appbg-type"></div><div class="appbg-panel"></div></div>
-    <div class="field"><span>Neue Notizen</span><button class="btn" data-x="defaults">${icon('textSize')} Standard-Schrift &amp; -Hintergrund festlegen</button></div>
-  </section>`);
-  sec.querySelector('.accent-row').append(colorRow(ACCENTS, p.accent || null, c => saveAppPrefs({ accent: c || null }), { noneLabel: 'Standard' }));
-  const panel = sec.querySelector('.appbg-panel');
-  let bg = { ...(p.appBg || { type: 'none' }) };
-  const save = () => saveAppPrefs({ appBg: { ...bg } });
-  const render = () => {
+/** Dialog „Farben & Design“: Vorlagen, Hell/Dunkel, Akzentfarbe, eigene Farben, App-Hintergrund. */
+function openDesign() {
+  const body = el(`<div class="design-panel">
+    <section><h3>Vorlagen</h3><div class="preset-row"></div></section>
+    <section><h3>Hell oder dunkel</h3><div class="mode-row"></div></section>
+    <section><h3>Akzentfarbe</h3><p class="muted small">Knöpfe, Häkchen, Markierungen</p><div class="accent-row"></div></section>
+    <section class="custom-colors"><h3>Eigene Farben</h3><div class="cf"></div><button type="button" class="btn small reset-colors">Farben der Vorlage wiederherstellen</button></section>
+    <section><h3>App-Hintergrund</h3><p class="muted small">Farbe oder Foto hinter Notizliste und Seitenleiste</p><div class="appbg-type"></div><div class="appbg-panel"></div></section>
+    <section><h3>Neue Notizen</h3><button class="btn" data-x="defaults">${icon('textSize')} Standard-Schrift &amp; -Hintergrund festlegen</button></section>
+    <p class="muted small">Gilt auf allen deinen Geräten.</p>
+  </div>`);
+
+  const presetRow = body.querySelector('.preset-row');
+  const renderPresets = () => {
+    const p = appPrefs();
+    presetRow.innerHTML = '';
+    for (const pr of PRESETS) {
+      const c = pr.colors || { bg: '#1c1b1a', side: '#232120', card: '#2c2a27' };
+      const b = el(`<button type="button" class="preset ${p.preset === pr.id ? 'on' : ''}"><div class="pv" style="background:${c.bg}"><i style="background:${c.side}"></i><b style="background:${c.card};border-top:3px solid ${pr.accent}"></b></div><span>${esc(pr.name)}</span></button>`);
+      b.onclick = async () => {
+        await saveAppPrefs({ preset: pr.id, themeMode: pr.mode, accent: pr.accent, colors: pr.colors ? { ...pr.colors } : null });
+        renderAll();
+      };
+      presetRow.append(b);
+    }
+  };
+
+  const renderMode = () => {
+    const box = body.querySelector('.mode-row');
+    box.innerHTML = '';
+    box.append(segmented([{ value: 'light', label: 'Hell' }, { value: 'dark', label: 'Dunkel' }, { value: 'auto', label: 'Wie das Gerät' }],
+      appPrefs().themeMode || 'light', async v => { await saveAppPrefs({ themeMode: v }); renderAll(); }));
+  };
+
+  const renderAccent = () => {
+    const box = body.querySelector('.accent-row');
+    box.innerHTML = '';
+    box.append(colorRow(ACCENTS, appPrefs().accent || null, c => saveAppPrefs({ accent: c || null }), { noneLabel: 'Standard' }));
+  };
+
+  const renderColors = () => {
+    const p = appPrefs();
+    const sec = body.querySelector('.custom-colors');
+    sec.classList.toggle('hidden', (p.themeMode || 'light') !== 'light');
+    const box = sec.querySelector('.cf');
+    box.innerHTML = '';
+    const base = (PRESETS.find(x => x.id === p.preset) || PRESETS[0]).colors;
+    const cur = { ...base, ...(p.colors || {}) };
+    for (const f of COLOR_FIELDS) {
+      const row = el(`<div class="color-field"><span>${esc(f.label)}</span></div>`);
+      row.append(colorRow(f.key === 'ink' ? INK_COLORS : UI_COLORS, cur[f.key], c => {
+        const colors = { ...base, ...(appPrefs().colors || {}), [f.key]: c };
+        saveAppPrefs({ colors });
+      }));
+      box.append(row);
+    }
+  };
+  body.querySelector('.reset-colors').onclick = async () => {
+    const p = appPrefs();
+    const pr = PRESETS.find(x => x.id === p.preset) || PRESETS[0];
+    await saveAppPrefs({ colors: pr.colors ? { ...pr.colors } : null });
+    renderColors();
+  };
+
+  // App-Hintergrund
+  const panel = body.querySelector('.appbg-panel');
+  let bg = { ...(appPrefs().appBg || { type: 'none' }) };
+  const saveBg = () => saveAppPrefs({ appBg: { ...bg } });
+  const renderBg = () => {
     panel.innerHTML = '';
-    if (bg.type === 'color') panel.append(colorRow(BG_COLORS, bg.color, c => { bg.color = c; save(); }));
+    if (bg.type === 'color') panel.append(colorRow(BG_COLORS, bg.color, c => { bg.color = c; saveBg(); }));
     if (bg.type === 'image') {
       const box = el(`<div class="bg-image-box"><div class="bg-thumb"></div><div class="bg-image-tools">
         <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
@@ -448,8 +519,11 @@ function designSection() {
       upd();
       const dim = box.querySelector('.dim');
       dim.value = Math.round((bg.dim || 0) * 100);
-      dim.addEventListener('input', () => { bg.dim = Number(dim.value) / 100; upd(); applyAppPreview(); });
-      dim.addEventListener('change', save);
+      dim.addEventListener('input', () => {
+        bg.dim = Number(dim.value) / 100; upd();
+        if (bg.image) document.documentElement.style.setProperty('--app-bg', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`);
+      });
+      dim.addEventListener('change', saveBg);
       box.querySelector('.pick').onclick = async () => {
         const file = await pickImageFile();
         if (!file) return;
@@ -457,23 +531,25 @@ function designSection() {
         const cropped = await cropDialog(url, { title: 'App-Hintergrund zuschneiden', applyLabel: 'Verwenden' });
         if (!cropped) return;
         bg = { type: 'image', image: cropped, dim: bg.dim || 0, lum: await measureLum(cropped) };
-        await save();
-        render();
+        await saveBg();
+        renderBg();
       };
       panel.append(box);
     }
   };
-  const applyAppPreview = () => { document.documentElement.style.setProperty('--app-bg', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`); };
-  sec.querySelector('.appbg-type').append(segmented([{ value: 'none', label: 'Standard' }, { value: 'color', label: 'Farbe' }, { value: 'image', label: 'Foto' }], bg.type || 'none', v => {
+  body.querySelector('.appbg-type').append(segmented([{ value: 'none', label: 'Keiner' }, { value: 'color', label: 'Farbe' }, { value: 'image', label: 'Foto' }], bg.type || 'none', v => {
     if (v === 'none') bg = { type: 'none' };
     if (v === 'color') bg = { type: 'color', color: bg.color || BG_COLORS[4] };
     if (v === 'image') bg = { type: 'image', image: bg.image || '', dim: bg.dim || 0, lum: bg.lum };
-    if (v !== 'image' || bg.image) save();
-    render();
+    if (v !== 'image' || bg.image) saveBg();
+    renderBg();
   }));
-  render();
-  sec.querySelector('[data-x=defaults]').onclick = editNoteDefaults;
-  return sec;
+  body.querySelector('[data-x=defaults]').onclick = editNoteDefaults;
+
+  const renderAll = () => { renderPresets(); renderMode(); renderAccent(); renderColors(); };
+  renderAll();
+  renderBg();
+  dialog({ title: 'Farben & Design', body, wide: true, cls: 'sheet-compact' });
 }
 
 // ---------------- Einstellungen ----------------
@@ -507,7 +583,9 @@ function openSettings() {
     ? `Status: ${({ ok: 'verbunden', syncing: 'synchronisiere …', offline: 'offline', error: 'Fehler – ' + st.message, 'needs-auth': 'Anmeldung abgelaufen' })[st.state] || 'verbunden'}` +
       (st.lastSync ? ` · letzter Abgleich ${relTime(st.lastSync)}` : '')
     : 'Status: nicht verbunden';
-  body.querySelector('section').after(designSection());
+  const designBtn = el(`<section><h3>${icon('palette')} Farben &amp; Design</h3><p class="muted">Vorlagen, Hell/Dunkel, Akzentfarbe, eigene Farben, App-Hintergrund und Standard für neue Notizen.</p><div class="row"><button class="btn primary">Design anpassen</button></div></section>`);
+  designBtn.querySelector('button').onclick = () => { d.close(); openDesign(); };
+  body.querySelector('section').after(designBtn);
   const d = dialog({ title: 'Einstellungen', body, wide: true });
   body.querySelector('#client-id')?.addEventListener('change', e => { sync.setClientId(e.target.value); sync.preload(); });
   body.addEventListener('click', async e => {
@@ -594,6 +672,7 @@ function bindUI() {
   $('#menu-btn').onclick = () => app.classList.toggle('drawer-open');
   $('#scrim').onclick = () => app.classList.remove('drawer-open');
   $('#settings-btn').onclick = openSettings;
+  $('#design-btn').onclick = openDesign;
   $('#sync-btn').onclick = onSyncClick;
   $('#list-sync').onclick = onSyncClick;
   $('#fab').onclick = newNote;

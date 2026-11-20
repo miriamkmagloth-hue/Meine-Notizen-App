@@ -45,7 +45,7 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
       const bg = style.bg;
       if (bg.type === 'color' || bg.type === 'pattern') {
         if (bg.type === 'pattern') {
-          panel.append(segmented(PATTERNS.map(p => ({ value: p.id, label: p.name })), bg.pattern || 'lined', v => { style.bg.pattern = v; emit(); }));
+          panel.append(segmented(PATTERNS.map(p => ({ value: p.id, label: p.name })), bg.pattern || 'blank', v => { style.bg.pattern = v; emit(); }));
         }
         panel.append(colorRow(BG_COLORS, bg.color, c => { style.bg.color = c; emit(); }));
       } else if (bg.type === 'image') {
@@ -89,7 +89,7 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
       const old = style.bg;
       if (v === 'none') style.bg = { type: 'none' };
       else if (v === 'color') style.bg = { type: 'color', color: old.color || BG_COLORS[2] };
-      else if (v === 'pattern') style.bg = { type: 'pattern', pattern: old.pattern || 'lined', color: old.color || BG_COLORS[0] };
+      else if (v === 'pattern') style.bg = { type: 'pattern', pattern: old.pattern || 'blank', color: old.color || BG_COLORS[0] };
       else style.bg = { type: 'image', image: old.image || '', dim: old.dim || 0, lum: old.lum };
       emit();
       renderPanel();
