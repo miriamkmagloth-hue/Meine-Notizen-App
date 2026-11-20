@@ -5,7 +5,7 @@ import { Editor } from './editor.js';
 import { icon, el, esc, dialog, confirmBox, promptBox, choose, toast, relTime, closeTopDialog } from './ui.js';
 import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
-import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS } from './theme.js';
+import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
@@ -443,6 +443,7 @@ async function editNoteDefaults() {
 function openDesign() {
   const body = el(`<div class="design-panel">
     <section><h3>Vorlagen</h3><div class="preset-row"></div></section>
+    <section><h3>Schriftart</h3><div class="font-row"></div></section>
     <section><h3>Hell oder dunkel</h3><div class="mode-row"></div></section>
     <section><h3>Akzentfarbe</h3><p class="muted small">Knöpfe, Häkchen, Markierungen</p><div class="accent-row"></div></section>
     <section class="custom-colors"><h3>Eigene Farben</h3><div class="cf"></div><button type="button" class="btn small reset-colors">Farben der Vorlage wiederherstellen</button></section>
@@ -463,6 +464,17 @@ function openDesign() {
         renderAll();
       };
       presetRow.append(b);
+    }
+  };
+
+  const renderFonts = () => {
+    const box = body.querySelector('.font-row');
+    box.innerHTML = '';
+    const cur = appPrefs().font || FONTS[0].id;
+    for (const f of FONTS) {
+      const b = el(`<button type="button" class="font-opt ${f.id === cur ? 'on' : ''}"><span class="fo-big" style="font-family:${esc(f.display)}">Aa</span><span class="fo-name" style="font-family:${esc(f.body)}">${esc(f.name)}</span><small>${esc(f.hint)}</small></button>`);
+      b.onclick = async () => { await saveAppPrefs({ font: f.id }); renderFonts(); };
+      box.append(b);
     }
   };
 
@@ -513,24 +525,31 @@ function openDesign() {
     if (bg.type === 'image') {
       const box = el(`<div class="bg-image-box"><div class="bg-thumb"></div><div class="bg-image-tools">
         <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
-        <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label></div></div>`);
+        <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label>
+        <label class="dim-label">Deckkraft <input type="range" min="10" max="100" step="5" class="op"> <span class="op-val"></span></label></div></div>`);
       const thumb = box.querySelector('.bg-thumb');
-      const upd = () => { thumb.style.background = bg.image ? `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover` : ''; };
+      const upd = () => {
+        thumb.style.background = bg.image ? `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover` : '';
+        thumb.style.opacity = typeof bg.opacity === 'number' ? Math.max(0.25, bg.opacity) : 1;
+      };
       upd();
       const dim = box.querySelector('.dim');
       dim.value = Math.round((bg.dim || 0) * 100);
-      dim.addEventListener('input', () => {
-        bg.dim = Number(dim.value) / 100; upd();
-        if (bg.image) document.documentElement.style.setProperty('--app-bg', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`);
-      });
+      dim.addEventListener('input', () => { bg.dim = Number(dim.value) / 100; upd(); if (bg.image) setAppBgImage(bg); });
       dim.addEventListener('change', saveBg);
+      const op = box.querySelector('.op');
+      const opVal = box.querySelector('.op-val');
+      op.value = Math.round((typeof bg.opacity === 'number' ? bg.opacity : 1) * 100);
+      opVal.textContent = op.value + ' %';
+      op.addEventListener('input', () => { bg.opacity = Number(op.value) / 100; opVal.textContent = op.value + ' %'; upd(); if (bg.image) setAppBgImage(bg); });
+      op.addEventListener('change', saveBg);
       box.querySelector('.pick').onclick = async () => {
         const file = await pickImageFile();
         if (!file) return;
         const url = await fileToDataUrl(file, 1600);
         const cropped = await cropDialog(url, { title: 'App-Hintergrund zuschneiden', applyLabel: 'Verwenden' });
         if (!cropped) return;
-        bg = { type: 'image', image: cropped, dim: bg.dim || 0, lum: await measureLum(cropped) };
+        bg = { type: 'image', image: cropped, dim: bg.dim || 0, opacity: bg.opacity ?? 1, lum: await measureLum(cropped) };
         await saveBg();
         renderBg();
       };
@@ -540,13 +559,13 @@ function openDesign() {
   body.querySelector('.appbg-type').append(segmented([{ value: 'none', label: 'Keiner' }, { value: 'color', label: 'Farbe' }, { value: 'image', label: 'Foto' }], bg.type || 'none', v => {
     if (v === 'none') bg = { type: 'none' };
     if (v === 'color') bg = { type: 'color', color: bg.color || BG_COLORS[4] };
-    if (v === 'image') bg = { type: 'image', image: bg.image || '', dim: bg.dim || 0, lum: bg.lum };
+    if (v === 'image') bg = { type: 'image', image: bg.image || '', dim: bg.dim || 0, opacity: bg.opacity ?? 1, lum: bg.lum };
     if (v !== 'image' || bg.image) saveBg();
     renderBg();
   }));
   body.querySelector('[data-x=defaults]').onclick = editNoteDefaults;
 
-  const renderAll = () => { renderPresets(); renderMode(); renderAccent(); renderColors(); };
+  const renderAll = () => { renderPresets(); renderFonts(); renderMode(); renderAccent(); renderColors(); };
   renderAll();
   renderBg();
   dialog({ title: 'Farben & Design', body, wide: true, cls: 'sheet-compact' });

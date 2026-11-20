@@ -17,7 +17,9 @@
   --shadow: 0 1px 2px rgba(60, 45, 30, .06), 0 4px 16px rgba(60, 45, 30, .07);
   --shadow-lg: 0 10px 40px rgba(40, 30, 20, .22);
   --radius: 14px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --glass-border: rgba(255, 255, 255, .55);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light;
@@ -31,6 +33,7 @@
     --check: #5cc28f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
     color-scheme: dark;
+    --glass-border: rgba(255, 255, 255, .12);
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] {
@@ -41,6 +44,7 @@
     --check: #5cc28f;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
     color-scheme: dark;
+    --glass-border: rgba(255, 255, 255, .12);
   }
 }
 
@@ -381,15 +385,44 @@ body.quick .chip { max-width: 34vw; }
 .note-item[style*="--note-ink"] .ni-snippet { color: var(--note-ink-2); }
 .note-item[style*="--note-ink"] .ni-meta { color: var(--note-ink-3); }
 
-/* App-Hintergrund */
-body.has-app-bg #app { background: var(--app-bg); }
-body.has-app-bg #sidebar { background: color-mix(in srgb, var(--side) 72%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-body.has-app-bg #list-pane { background: transparent; }
-body.has-app-bg .pane-head h1 { text-shadow: 0 1px 8px color-mix(in srgb, var(--bg) 70%, transparent); }
-body.has-app-bg .search-box { background: color-mix(in srgb, var(--card) 85%, transparent); backdrop-filter: blur(8px); }
-body.has-app-bg .list-empty { background: color-mix(in srgb, var(--card) 80%, transparent); border-radius: 14px; margin: 10px 4px; }
-body.has-app-bg #editor-pane:not(.has-note-bg) { background: color-mix(in srgb, var(--paper) 94%, transparent); }
-@media (max-width: 1099px) { body.has-app-bg #sidebar { background: color-mix(in srgb, var(--side) 90%, transparent); } }
+/* App-Hintergrund: Bild über die ganze App, Bereiche als schwebende Glas-Karten */
+body.has-app-bg #app {
+  background: var(--app-bg-color, var(--bg));
+  position: relative; isolation: isolate;
+  padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom));
+  gap: 12px;
+}
+body.has-app-bg #app::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--app-bg-img, none);
+  opacity: var(--app-bg-op, 1);
+}
+body.has-app-bg #sidebar, body.has-app-bg #list-pane, body.has-app-bg #editor-pane {
+  border-radius: 24px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 40px rgba(70, 40, 50, .14), inset 0 1px 0 rgba(255,255,255,.35);
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+body.has-app-bg #sidebar { background: color-mix(in srgb, var(--side) 66%, transparent); border-right: 1px solid var(--glass-border); }
+body.has-app-bg #list-pane { background: color-mix(in srgb, var(--bg) 52%, transparent); border-right: 1px solid var(--glass-border); }
+body.has-app-bg #editor-pane:not(.has-note-bg) { background: color-mix(in srgb, var(--paper) 88%, transparent); }
+body.has-app-bg .note-item { background: color-mix(in srgb, var(--card) 86%, transparent); }
+body.has-app-bg .search-box { background: color-mix(in srgb, var(--card) 80%, transparent); }
+body.has-app-bg .list-empty { background: color-mix(in srgb, var(--card) 75%, transparent); border-radius: 16px; margin: 10px 4px; }
+body.has-app-bg .nav-item.on { background: color-mix(in srgb, var(--card) 88%, transparent); }
+body.has-app-bg .sidebar-foot { border-top-color: var(--glass-border); }
+@media (max-width: 1099px) {
+  body.has-app-bg #sidebar { top: calc(12px + var(--safe-top)); left: 12px; bottom: calc(12px + var(--safe-bottom)); height: auto; background: color-mix(in srgb, var(--side) 88%, transparent); }
+}
+@media (max-width: 759px) {
+  body.has-app-bg #app { padding: calc(8px + var(--safe-top)) 8px calc(8px + var(--safe-bottom)); }
+  body.has-app-bg #list-pane, body.has-app-bg #editor-pane { border-radius: 20px; }
+  body.has-app-bg #sidebar { left: 8px; top: calc(8px + var(--safe-top)); bottom: calc(8px + var(--safe-bottom)); }
+}
+
+/* Hintergrundbild einer Notiz (mit Deckkraft) */
 
 /* Kompaktes Blatt, damit die Notiz als Vorschau sichtbar bleibt */
 @media (max-width: 759px) {
@@ -459,3 +492,27 @@ body.widgetcfg #app { display: none; }
 .color-field > span { font-size: 13.5px; color: var(--ink-2); padding-top: 7px; }
 @media (max-width: 759px) { .color-field { grid-template-columns: 1fr; gap: 4px; } }
 .design-panel .swatch:not(.none) { width: 28px; height: 28px; }
+
+/* Typografie: hübsch, aber gut lesbar */
+.note-title, .pane-head h1, .brand, .modal-head h2, .wcfg-head h2, .content h1, .content h2, .bp-h1, .bp-h2 {
+  font-family: var(--font-display);
+  letter-spacing: -.005em;
+}
+.note-title { font-weight: 600; }
+.pane-head h1 { font-weight: 600; font-size: 25px; }
+.brand { font-weight: 600; font-size: 20px; }
+.content h1 { font-weight: 600; }
+.content h2 { font-weight: 600; }
+.modal-head h2 { font-weight: 600; font-size: 20px; }
+.ni-title { font-weight: 700; }
+.btn, .chip, .nav-item.on { font-weight: 700; }
+body { font-weight: 500; }
+.content { font-weight: 450; }
+
+/* Schriftauswahl */
+.font-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+.font-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 10px 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); text-align: left; }
+.font-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.fo-big { font-size: 26px; line-height: 1.1; }
+.fo-name { font-size: 14.5px; font-weight: 700; }
+.font-opt small { font-size: 11.5px; color: var(--ink-3); }

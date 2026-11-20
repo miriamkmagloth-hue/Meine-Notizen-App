@@ -54,6 +54,7 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
           <div class="bg-image-tools">
             <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
             <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label>
+            <label class="dim-label">Deckkraft <input type="range" min="10" max="100" step="5" class="op"> <span class="op-val"></span></label>
           </div>
         </div>`);
         const thumb = box.querySelector('.bg-thumb');
@@ -66,6 +67,12 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
         dim.value = Math.round((bg.dim || 0) * 100);
         dim.disabled = !bg.image;
         dim.addEventListener('input', () => { style.bg.dim = Number(dim.value) / 100; updThumb(); emit(); });
+        const op = box.querySelector('.op');
+        const opVal = box.querySelector('.op-val');
+        op.value = Math.round((typeof bg.opacity === 'number' ? bg.opacity : 1) * 100);
+        opVal.textContent = op.value + ' %';
+        op.disabled = !bg.image;
+        op.addEventListener('input', () => { style.bg.opacity = Number(op.value) / 100; opVal.textContent = op.value + ' %'; emit(); });
         box.querySelector('.pick').onclick = async () => {
           const file = await pickImageFile();
           if (!file) return;
@@ -73,7 +80,7 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
             const url = await fileToDataUrl(file, 1400);
             const cropped = await cropDialog(url, { title: 'Hintergrundbild zuschneiden', applyLabel: 'Verwenden' });
             if (!cropped) return;
-            style.bg = { type: 'image', image: cropped, dim: style.bg.dim ?? 0, lum: await measureLum(cropped) };
+            style.bg = { type: 'image', image: cropped, dim: style.bg.dim ?? 0, opacity: style.bg.opacity ?? 1, lum: await measureLum(cropped) };
             emit();
             renderPanel();
           } catch (e) { toast(e.message); }
@@ -90,7 +97,7 @@ export function openNoteStyle(initial, { title = 'Aussehen der Notiz', onChange 
       if (v === 'none') style.bg = { type: 'none' };
       else if (v === 'color') style.bg = { type: 'color', color: old.color || BG_COLORS[2] };
       else if (v === 'pattern') style.bg = { type: 'pattern', pattern: old.pattern || 'blank', color: old.color || BG_COLORS[0] };
-      else style.bg = { type: 'image', image: old.image || '', dim: old.dim || 0, lum: old.lum };
+      else style.bg = { type: 'image', image: old.image || '', dim: old.dim || 0, opacity: old.opacity ?? 1, lum: old.lum };
       emit();
       renderPanel();
     }));

@@ -35,6 +35,15 @@ export const COLOR_FIELDS = [
 export const UI_COLORS = ['#ffffff', '#fffdf9', '#f7f4ef', '#efeae2', '#f6efe3', '#fff4c7', '#ffe9dc', '#fbe4e8', '#f0e6fb', '#e3e9fb', '#e1effa', '#e2f3ea', '#eef3e2', '#eeeeee', '#d9d4cc'];
 export const INK_COLORS = ['#26221e', '#1f2328', '#3a2a2e', '#23302a', '#2c2538', '#1d2b38', '#4a3b2a', '#555555'];
 
+/** Schriftarten (werden bei Internet geladen, sonst Systemschrift). */
+export const FONTS = [
+  { id: 'huebsch', name: 'Hübsch', hint: 'weich & rund', body: '"Nunito", system-ui, sans-serif', display: '"Fraunces", Georgia, serif' },
+  { id: 'elegant', name: 'Elegant', hint: 'fein & klassisch', body: '"Lora", Georgia, serif', display: '"Playfair Display", Georgia, serif' },
+  { id: 'leicht', name: 'Leicht', hint: 'luftig & modern', body: '"Quicksand", system-ui, sans-serif', display: '"Fraunces", Georgia, serif' },
+  { id: 'klar', name: 'Klar', hint: 'sachlich', body: '"DM Sans", system-ui, sans-serif', display: '"DM Sans", system-ui, sans-serif' },
+  { id: 'system', name: 'Gerät', hint: 'Schrift des Geräts', body: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', display: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+];
+
 export const ACCENTS = ['#d2693a', '#e5484d', '#d6409f', '#c2185b', '#8e4ec6', '#5b5bd6', '#3e63dd', '#0091ff', '#12a594', '#30a46c', '#9c7a3c', '#6f6e77'];
 
 export function hexToRgb(hex) {
@@ -104,9 +113,14 @@ export function resolveNoteStyle(style) {
     out.background = c;
     out.paper = c;
   } else if (bg.type === 'image' && bg.image) {
-    lum = imageLum(bg);
-    out.background = `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`;
-    out.paper = lum > 0.36 ? '#fffdf9' : '#1f1d1b';
+    const op = typeof bg.opacity === 'number' ? bg.opacity : 1;
+    const imgLum = imageLum(bg);
+    out.paper = imgLum > 0.36 ? '#fffdf9' : '#1f1d1b';
+    lum = imgLum * op + luminance(out.paper) * (1 - op);
+    const layers = `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`;
+    const { r, g, b } = hexToRgb(out.paper);
+    const veil = `rgba(${r},${g},${b},${(1 - op).toFixed(2)})`;
+    out.background = `linear-gradient(${veil}, ${veil}), ${layers}`;
   }
   out.ink = s.color || (lum !== null ? inkFor(lum) : '');
   if (bg.type === 'pattern') {
@@ -212,18 +226,30 @@ export function applyAppTheme() {
     root.style.removeProperty('--accent');
     root.style.removeProperty('--accent-ink');
   }
+  const font = FONTS.find(f => f.id === p.font) || FONTS[0];
+  root.style.setProperty('--font', font.body);
+  root.style.setProperty('--font-display', font.display);
+
   const bg = p.appBg || { type: 'none' };
   document.body.classList.toggle('has-app-bg', bg.type === 'color' || (bg.type === 'image' && !!bg.image));
+  root.style.removeProperty('--app-bg-color');
+  root.style.removeProperty('--app-bg-img');
+  root.style.removeProperty('--app-bg-op');
   if (bg.type === 'color') {
-    root.style.setProperty('--app-bg', bg.color);
+    root.style.setProperty('--app-bg-color', bg.color);
   } else if (bg.type === 'image' && bg.image) {
-    root.style.setProperty('--app-bg', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`);
-  } else {
-    root.style.removeProperty('--app-bg');
+    setAppBgImage(bg);
   }
   const barColor = bg.type === 'color' ? bg.color : getComputedStyle(root).getPropertyValue('--bg').trim();
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', barColor));
   try { window.AndroidBridge?.setSystemBars?.(barColor, luminance(barColor) > 0.4); } catch { /* egal */ }
+}
+
+/** App-Hintergrundbild setzen (auch für die Live-Vorschau im Design-Dialog). */
+export function setAppBgImage(bg) {
+  const root = document.documentElement;
+  root.style.setProperty('--app-bg-img', `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover no-repeat`);
+  root.style.setProperty('--app-bg-op', String(typeof bg.opacity === 'number' ? bg.opacity : 1));
 }
 
 if (typeof window !== 'undefined') {
