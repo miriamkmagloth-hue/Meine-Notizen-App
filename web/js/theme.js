@@ -240,9 +240,18 @@ export function applyAppTheme() {
   } else if (bg.type === 'image' && bg.image) {
     setAppBgImage(bg);
   }
+  setGlass(typeof p.glass === 'number' ? p.glass : 45);
   const barColor = bg.type === 'color' ? bg.color : getComputedStyle(root).getPropertyValue('--bg').trim();
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', barColor));
   try { window.AndroidBridge?.setSystemBars?.(barColor, luminance(barColor) > 0.4); } catch { /* egal */ }
+}
+
+/** Glas-Effekt: 0 = klar (Bild gut sichtbar) … 100 = milchig (ruhiger). */
+export function setGlass(g) {
+  const root = document.documentElement;
+  root.style.setProperty('--glass-pct', Math.round(25 + g * 0.65) + '%');
+  root.style.setProperty('--glass-blur', Math.round(3 + g * 0.25) + 'px');
+  root.style.setProperty('--editor-pct', Math.round(62 + g * 0.34) + '%');
 }
 
 /** App-Hintergrundbild setzen (auch für die Live-Vorschau im Design-Dialog). */

@@ -5,7 +5,7 @@ import { Editor } from './editor.js';
 import { icon, el, esc, dialog, confirmBox, promptBox, choose, toast, relTime, closeTopDialog } from './ui.js';
 import { isAndroid, isQuick, isWidgetCfg, call } from './native.js';
 import { pushNote, pushIndex, pushAll, applyPendingToggles } from './widget.js';
-import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage } from './theme.js';
+import { applyAppTheme, applyNoteStyle, appPrefs, saveAppPrefs, ACCENTS, BG_COLORS, measureLum, overlayCss, folderIcon, FOLDER_COLORS, PRESETS, COLOR_FIELDS, UI_COLORS, INK_COLORS, FONTS, setAppBgImage, setGlass } from './theme.js';
 import { openNoteStyle } from './notestyle.js';
 import { colorRow, segmented } from './ui.js';
 import { pickImageFile, fileToDataUrl, cropDialog } from './imagetools.js';
@@ -526,7 +526,8 @@ function openDesign() {
       const box = el(`<div class="bg-image-box"><div class="bg-thumb"></div><div class="bg-image-tools">
         <button type="button" class="btn small pick">${icon('image')} ${bg.image ? 'Anderes Foto' : 'Foto wählen'}</button>
         <label class="dim-label">Abdunkeln <input type="range" min="-70" max="70" step="5" class="dim"> Aufhellen</label>
-        <label class="dim-label">Deckkraft <input type="range" min="10" max="100" step="5" class="op"> <span class="op-val"></span></label></div></div>`);
+        <label class="dim-label">Deckkraft <input type="range" min="10" max="100" step="5" class="op"> <span class="op-val"></span></label>
+        <label class="dim-label">Glas: klar <input type="range" min="0" max="100" step="5" class="glass"> milchig</label></div></div>`);
       const thumb = box.querySelector('.bg-thumb');
       const upd = () => {
         thumb.style.background = bg.image ? `linear-gradient(${overlayCss(bg.dim)}, ${overlayCss(bg.dim)}), url("${bg.image}") center / cover` : '';
@@ -543,6 +544,10 @@ function openDesign() {
       opVal.textContent = op.value + ' %';
       op.addEventListener('input', () => { bg.opacity = Number(op.value) / 100; opVal.textContent = op.value + ' %'; upd(); if (bg.image) setAppBgImage(bg); });
       op.addEventListener('change', saveBg);
+      const glass = box.querySelector('.glass');
+      glass.value = typeof appPrefs().glass === 'number' ? appPrefs().glass : 45;
+      glass.addEventListener('input', () => setGlass(Number(glass.value)));
+      glass.addEventListener('change', () => saveAppPrefs({ glass: Number(glass.value) }));
       box.querySelector('.pick').onclick = async () => {
         const file = await pickImageFile();
         if (!file) return;
