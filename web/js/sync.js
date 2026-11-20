@@ -190,6 +190,14 @@ export async function sync({ interactive = false } = {}) {
       if (known && known.fileId === f.id && known.version === f.version) continue; // nichts Neues
       const data = await download(f.id);
       const local = model.find(type, id);
+      // Google Drive erhöht die Versionsnummer manchmal, ohne dass sich der Inhalt geändert hat.
+      // Entscheidend ist daher, ob es wirklich eine neue Fassung von einem anderen Gerät ist.
+      const reallyNew = !known || known.u === undefined ? !local || (data.updatedAt || 0) > (local.updatedAt || 0) || !local.dirty
+        : (data.updatedAt || 0) !== known.u;
+      if (local && local.dirty && !reallyNew) {
+        meta[key] = { fileId: f.id, version: f.version, u: known?.u ?? data.updatedAt };
+        continue; // nichts Neues von außen – die lokale Änderung wird gleich hochgeladen
+      }
       if (!local || !local.dirty) {
         await applyRemote(type, data);
       } else if (sameContent(local, data)) {
@@ -200,8 +208,15 @@ export async function sync({ interactive = false } = {}) {
         // Die neuere Fassung bleibt die Notiz, die ältere wird als Kopie gesichert.
         const localNewer = (local.updatedAt || 0) >= (data.updatedAt || 0);
         const older = localNewer ? data : { ...local };
-        const copy = { ...clean(older), id: model.uid(), title: model.noteTitle(older) + ' (Konflikt-Kopie)' };
-        await model.saveNote(copy);
+        const newer = localNewer ? local : data;
+        const olderText = model.htmlToText(older.html || '').trim();
+        const newerText = model.htmlToText(newer.html || '').trim();
+        // Nur sichern, wenn in der älteren Fassung wirklich etwas steht, das in der neueren fehlt
+        const worthKeeping = (olderText && !newerText.includes(olderText)) || /<img/.test(older.html || '') && !/<img/.test(newer.html || '');
+        if (worthKeeping) {
+          const copy = { ...clean(older), id: model.uid(), title: model.noteTitle(older) + ' (Konflikt-Kopie)' };
+          await model.saveNote(copy);
+        }
         if (!localNewer) await applyRemote(type, data);
       } else if (local.deleted && !data.deleted) {
         await applyRemote(type, data); // woanders weiterbearbeitet → wiederherstellen
@@ -210,7 +225,7 @@ export async function sync({ interactive = false } = {}) {
       } else if ((data.updatedAt || 0) > (local.updatedAt || 0)) {
         await applyRemote(type, data);
       }
-      meta[key] = { fileId: f.id, version: f.version };
+      meta[key] = { fileId: f.id, version: f.version, u: data.updatedAt };
     }
 
     // 2) Eigene Änderungen hochladen
@@ -222,7 +237,7 @@ export async function sync({ interactive = false } = {}) {
         const fileId = meta[key]?.fileId || remoteNames.get(name)?.id;
         const stamp = item.updatedAt;
         const res = await upload(name, clean(item), fileId);
-        meta[key] = { fileId: res.id, version: res.version };
+        meta[key] = { fileId: res.id, version: res.version, u: stamp };
         const current = model.find(type, item.id);
         if (current && current.updatedAt === stamp) {
           current.dirty = false;
