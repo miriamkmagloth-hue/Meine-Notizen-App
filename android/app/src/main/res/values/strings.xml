@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meine Notizen</string>
+    <string name="widget_label">Notiz</string>
+    <string name="widget_desc">Zeigt eine Notiz – Kontrollkästchen direkt abhaken, Text antippen zum Bearbeiten.</string>
+    <string name="widget_pick_note">Tippe hier, um eine Notiz auszuwählen.</string>
+    <string name="widget_empty_note">Leere Notiz – tippe zum Schreiben.</string>
+    <string name="widget_more">… und %1$d weitere Zeilen</string>
+    <string name="widget_choose_title">Notiz für das Widget wählen</string>
+    <string name="widget_no_notes">Noch keine Notizen vorhanden. Öffne zuerst die App und lege eine Notiz an.</string>
+    <string name="widget_open_app">App öffnen</string>
+    <string name="edit">Bearbeiten</string>
+    <string name="switch_note">Andere Notiz</string>
+</resources>
