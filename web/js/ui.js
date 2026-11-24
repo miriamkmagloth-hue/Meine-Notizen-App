@@ -35,6 +35,8 @@ export const icons = {
   open: '<path d="M14 4h6v6M20 4l-8 8M18 14v5H5V6h5"/>',
   folder: '<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   heading: '<path d="M6 5v14M18 5v14M6 12h12"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  done: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   textColor: '<path d="M6.5 16L12 4l5.5 12M8.6 11.5h6.8"/>',
   textSize: '<path d="M3 18l4.5-11L12 18M4.6 14.2h5.8M14 18l3-7 3 7M15 15.8h4"/>',
   palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.2-1-1.6-1-2.6 0-1 .8-1.7 1.8-1.7h2A3.9 3.9 0 0 0 20.5 11 8 8 0 0 0 12 3.5z"/><circle cx="7.8" cy="11" r="1.1"/><circle cx="10.5" cy="7.5" r="1.1"/><circle cx="14.8" cy="7.8" r="1.1"/>',

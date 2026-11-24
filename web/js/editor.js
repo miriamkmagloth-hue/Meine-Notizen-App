@@ -138,6 +138,18 @@ export class Editor {
     return clone.innerHTML;
   }
 
+  /** Lesemodus (nur lesen und abhaken) oder Bearbeitungsmodus. */
+  setReadOnly(ro) {
+    this.readOnly = !!ro;
+    this.content.contentEditable = ro ? 'false' : 'true';
+    this.root.classList.toggle('read-only', this.readOnly);
+    if (ro) {
+      this.deselectImage();
+      this.pops.forEach(p => p.classList.add('hidden'));
+      if (document.activeElement === this.content) this.content.blur();
+    }
+  }
+
   focus(atEnd = true) {
     this.content.focus();
     if (atEnd) {
@@ -561,10 +573,14 @@ export class Editor {
 
     // Kontrollkästchen abhaken
     const checkHit = e => {
-      const li = e.target.closest?.('ul.checklist > li');
+      const t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      let li = t?.closest?.('ul.checklist > li');
+      // Tipp knapp neben den Punkt: passenden Eintrag über die Höhe finden
+      if (!li && t?.matches?.('ul.checklist')) li = [...t.children].find(x => { const r = x.getBoundingClientRect(); return e.clientY >= r.top && e.clientY <= r.bottom; });
       if (!li) return null;
+      if (this.readOnly) return li; // im Lesemodus hakt ein Tipp auf die ganze Zeile ab
       const r = li.getBoundingClientRect();
-      return e.clientX - r.left < 30 ? li : null;
+      return e.clientX - r.left < 40 ? li : null;
     };
     c.addEventListener('mousedown', e => { if (checkHit(e)) e.preventDefault(); });
     c.addEventListener('click', e => {
@@ -575,6 +591,7 @@ export class Editor {
         this.changed();
         return;
       }
+      if (this.readOnly) return;
       if (e.target.tagName === 'IMG') { this.selectImage(e.target); return; }
       this.deselectImage();
     });

@@ -51,6 +51,19 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".WidgetClickActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="at.meinenotizen.app.click"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <service
+            android:name=".NoteWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <receiver
             android:name=".NoteWidgetProvider"
             android:exported="true"

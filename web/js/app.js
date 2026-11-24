@@ -136,6 +136,29 @@ function remoteUpdateOfCurrent(item, force = false) {
   renderMeta();
 }
 
+// ---------------- Lesen / Bearbeiten ----------------
+let editing = false;
+function setEditing(on, { focus = true } = {}) {
+  editing = !!on || isQuick;
+  editor.setReadOnly(!editing);
+  $('#note-title').readOnly = !editing;
+  $('#editor-pane').classList.toggle('reading', !editing);
+  const b = $('#edit-btn');
+  b.innerHTML = editing ? `${icon('done')}<span>Fertig</span>` : `${icon('edit')}<span>Bearbeiten</span>`;
+  b.title = editing ? 'Bearbeiten beenden' : 'Notiz bearbeiten';
+  if (editing && focus && !isQuick) setTimeout(() => editor.focus(), 30);
+}
+
+async function toggleEditing() {
+  if (editing) {
+    await saveCurrent();
+    setEditing(false);
+    if (current && !isDraft && model.isEmptyNote(current)) { /* leere Notiz bleibt bis zum Schließen */ }
+  } else {
+    setEditing(true);
+  }
+}
+
 // ---------------- Notizen öffnen / anlegen ----------------
 async function openNote(id) {
   await leaveCurrent();
@@ -148,6 +171,7 @@ async function openNote(id) {
   editor.setHTML(note.html);
   $('#note-title').value = note.title || '';
   $('#saved-state').textContent = '';
+  setEditing(false);
   autoGrow();
   renderMeta();
   renderList();
@@ -169,6 +193,7 @@ async function newNote() {
   autoGrow();
   renderMeta();
   renderList();
+  setEditing(true, { focus: false });
   setTimeout(() => editor.focus(), 50);
 }
 
@@ -786,6 +811,9 @@ function bindUI() {
     toast(current.pinned ? 'Angeheftet' : 'Nicht mehr angeheftet');
   };
   $('#style-btn').onclick = editNoteStyle;
+  $('#edit-btn').onclick = toggleEditing;
+  // Doppeltipp auf den Text im Lesemodus startet ebenfalls das Bearbeiten
+  editor.content.addEventListener('dblclick', e => { if (!editing && !e.target.closest('ul.checklist > li')) setEditing(true); });
   $('#done-btn').onclick = finishQuick;
   $('#open-app-btn').onclick = async () => { await saveCurrent(); if (current) call('openInApp', current.id); };
   const title = $('#note-title');
@@ -805,6 +833,7 @@ function bindUI() {
   document.addEventListener('keydown', e => {
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.key.toLowerCase() === 'n' && !isAndroid) { e.preventDefault(); newNote(); }
+    if (mod && e.key.toLowerCase() === 'e' && current) { e.preventDefault(); toggleEditing(); }
     if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveCurrent().then(() => sync.schedule(100)); }
     if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); $('#search').focus(); }
     if (e.key === 'Escape' && !document.querySelector('.modal-backdrop') && isNarrow() && app.dataset.view === 'editor') closeEditor();
